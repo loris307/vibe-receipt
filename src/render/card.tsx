@@ -353,7 +353,9 @@ export function VibeCard({ receipt, s, size }: CardProps): React.ReactElement {
             }}
           >
             {receipt.meta.project}
-            {receipt.meta.branch ? `  @  ${receipt.meta.branch}` : ""}
+            {receipt.meta.branch && receipt.meta.branch !== "HEAD"
+              ? `  @  ${receipt.meta.branch}`
+              : ""}
             {receipt.meta.sources.length > 1
               ? `  ·  ${receipt.meta.sources.join("+")}`
               : ""}
@@ -367,7 +369,7 @@ export function VibeCard({ receipt, s, size }: CardProps): React.ReactElement {
       <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
         <SectionHeader>{s.sectionSession}</SectionHeader>
         {isMulti ? (
-          <>
+          <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
             <Row label={s.labelSessions} value={String(receipt.meta.sessionCount)} />
             <Row label={s.labelWallWindow} value={formatDurationMs(receipt.time.durationMs)} />
             <Row
@@ -375,7 +377,7 @@ export function VibeCard({ receipt, s, size }: CardProps): React.ReactElement {
               value={formatDurationMs(receipt.time.activeMs)}
               emphasis
             />
-          </>
+          </div>
         ) : (
           <Row
             label={s.labelDuration}

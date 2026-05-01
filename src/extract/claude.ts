@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { readJsonlAll } from "../util/jsonl.js";
 import { extractClaudePersonality } from "./personality/claude-jsonl.js";
+import { computeClaudeCostUsd } from "./claude-pricing.js";
 import type { LoadOpts, NormalizedSession } from "../data/types.js";
 
 /**
@@ -131,42 +132,69 @@ async function fallbackTokenSum(filePath: string): Promise<{
   return { inputTokens, outputTokens, cacheCreateTokens, cacheReadTokens };
 }
 
-/** Use ccusage's loadSessionUsageById for token + cost merging where possible. */
-async function mergeWithCcusage(
+/**
+ * Token + cost merge strategy:
+ * 1. Always run our own JSONL token-sum (dedup'd by message.id+requestId).
+ * 2. Try ccusage's loadSessionUsageById for an authoritative number; if it returns more,
+ *    use ccusage's tokens. (ccusage may have stricter dedup.)
+ * 3. Compute cost from our hardcoded model→price table (covers Anthropic models that
+ *    LiteLLM hasn't added yet).
+ * 4. If ccusage returned a non-zero cost, prefer that.
+ */
+async function mergeTokensAndCost(
   ns: NormalizedSession,
   filePath: string,
 ): Promise<NormalizedSession> {
-  // Try ccusage by sessionId; if it fails or returns nothing, fall back to JSONL summation.
+  const fb = await fallbackTokenSum(filePath);
+  let inputTokens = fb.inputTokens;
+  let outputTokens = fb.outputTokens;
+  let cacheCreateTokens = fb.cacheCreateTokens;
+  let cacheReadTokens = fb.cacheReadTokens;
+  let ccusageCost = 0;
+
   try {
     const mod: any = await import("ccusage/data-loader");
     const loadById = mod.loadSessionUsageById;
     if (typeof loadById === "function") {
       const data = await loadById(ns.sessionId, { mode: "auto" });
       if (data && typeof data === "object") {
-        const inputTokens = Number(data.inputTokens ?? data.input_tokens ?? 0);
-        const outputTokens = Number(data.outputTokens ?? data.output_tokens ?? 0);
-        const cacheCreateTokens = Number(
-          data.cacheCreationTokens ?? data.cache_creation_tokens ?? 0,
-        );
-        const cacheReadTokens = Number(data.cacheReadTokens ?? data.cache_read_tokens ?? 0);
-        const totalCostUsd = Number(data.totalCost ?? data.totalCostUsd ?? data.cost ?? 0);
-        if (inputTokens || outputTokens || cacheCreateTokens || cacheReadTokens) {
-          return {
-            ...ns,
-            inputTokens,
-            outputTokens,
-            cacheCreateTokens,
-            cacheReadTokens,
-            totalCostUsd,
-          };
+        const ci = Number(data.inputTokens ?? data.input_tokens ?? 0);
+        const co = Number(data.outputTokens ?? data.output_tokens ?? 0);
+        const cc = Number(data.cacheCreationTokens ?? data.cache_creation_tokens ?? 0);
+        const cr = Number(data.cacheReadTokens ?? data.cache_read_tokens ?? 0);
+        const cu = Number(data.totalCost ?? data.totalCostUsd ?? data.cost ?? 0);
+        // Use ccusage tokens if non-zero
+        if (ci + co + cc + cr > 0) {
+          inputTokens = ci;
+          outputTokens = co;
+          cacheCreateTokens = cc;
+          cacheReadTokens = cr;
         }
+        if (cu > 0) ccusageCost = cu;
       }
     }
   } catch {
-    // fall through to fallback
+    // ignore — use fallback values
   }
-  const fb = await fallbackTokenSum(filePath);
-  return { ...ns, ...fb };
+
+  const ourCost = computeClaudeCostUsd({
+    models: ns.models,
+    inputTokens,
+    outputTokens,
+    cacheCreateTokens,
+    cacheReadTokens,
+  });
+  // Prefer ccusage's authoritative cost when it returned one; else our table.
+  const totalCostUsd = ccusageCost > 0 ? ccusageCost : ourCost;
+
+  return {
+    ...ns,
+    inputTokens,
+    outputTokens,
+    cacheCreateTokens,
+    cacheReadTokens,
+    totalCostUsd,
+  };
 }
 
 function passesFilters(ns: NormalizedSession, opts: LoadOpts): boolean {
@@ -203,7 +231,7 @@ export const loadClaudeSessions: import("../data/types.js").SourceLoader = async
     if (!personality.sessionId) continue;
     const ns = personalityToNormalized(personality);
     if (!passesFilters(ns, opts)) continue;
-    const merged = await mergeWithCcusage(ns, path);
+    const merged = await mergeTokensAndCost(ns, path);
     out.push(merged);
     if (out.length >= limit) break;
   }
@@ -218,5 +246,5 @@ export const loadClaudeSessions: import("../data/types.js").SourceLoader = async
 export async function loadClaudeFromFile(filePath: string): Promise<NormalizedSession> {
   const personality = await extractClaudePersonality(filePath);
   const ns = personalityToNormalized(personality);
-  return mergeWithCcusage(ns, filePath);
+  return mergeTokensAndCost(ns, filePath);
 }
