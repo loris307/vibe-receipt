@@ -1,0 +1,76 @@
+import { basename } from "node:path";
+import type { Receipt, ReceiptScope } from "../data/receipt-schema.js";
+import type { NormalizedSession } from "../data/types.js";
+import { topToolStats } from "../data/types.js";
+import { computeFirstPromptFingerprint } from "../redact/fingerprint.js";
+
+export function buildSingleReceipt(ns: NormalizedSession): Receipt {
+  const scope: ReceiptScope = { kind: "single", sessionId: ns.sessionId };
+  const totalIn = ns.inputTokens + ns.cacheCreateTokens + ns.cacheReadTokens;
+  const cacheHitRatio = totalIn > 0 ? ns.cacheReadTokens / totalIn : 0;
+
+  const fp = computeFirstPromptFingerprint(ns.firstPrompt);
+
+  return {
+    scope,
+    generatedAt: new Date().toISOString(),
+
+    meta: {
+      project: basename(ns.cwd) || "unknown",
+      branch: ns.branch,
+      sources: [ns.source],
+      sessionCount: 1,
+      ...(ns.inFlight ? { inFlight: true } : {}),
+    },
+
+    time: {
+      startUtc: ns.startUtc,
+      endUtc: ns.endUtc,
+      durationMs: ns.durationMs,
+      activeMs: ns.activeMs,
+      afkMs: ns.afkMs,
+      afkRecaps: ns.afkRecaps,
+    },
+
+    cost: {
+      totalUsd: ns.totalCostUsd,
+      inputTokens: ns.inputTokens,
+      outputTokens: ns.outputTokens,
+      cacheCreateTokens: ns.cacheCreateTokens,
+      cacheReadTokens: ns.cacheReadTokens,
+      cacheHitRatio,
+      models: ns.models,
+    },
+
+    work: {
+      filesTouched: ns.filesTouched.length,
+      topFiles: ns.topFiles,
+      linesAdded: ns.linesAdded,
+      linesRemoved: ns.linesRemoved,
+      bashCommands: ns.bashCommands,
+      webFetches: ns.webFetches,
+      userModified: ns.userModified,
+    },
+
+    tools: {
+      total: Object.values(ns.toolCounts).reduce((s, n) => s + n, 0),
+      top: topToolStats(ns.toolCounts, 5),
+    },
+
+    subagents: ns.subagents,
+
+    personality: {
+      escInterrupts: ns.escInterrupts,
+      permissionFlips: ns.permissionFlips,
+      yoloEvents: ns.yoloEvents,
+      thinkingMs: ns.thinkingMs,
+      skills: ns.skills,
+      slashCommands: ns.slashCommands,
+      truncatedOutputs: ns.truncatedOutputs,
+      hookErrors: ns.hookErrors,
+      longestUserMsgChars: ns.longestUserMsgChars,
+    },
+
+    firstPrompt: fp,
+  };
+}
