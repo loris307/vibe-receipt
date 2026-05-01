@@ -79,7 +79,7 @@ export function computeFirstPromptFingerprint(prompt: string | null): FirstPromp
     return {
       wordCount: 0,
       charCount: 0,
-      moodEmoji: NEUTRAL_BOT,
+      moodEmoji: ASCII_NEUTRAL,
       fingerprintSha: "—",
       revealed: null,
     };

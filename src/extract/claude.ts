@@ -1,4 +1,4 @@
-import { glob } from "node:fs/promises";
+import { glob, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { readJsonlAll } from "../util/jsonl.js";
@@ -22,25 +22,28 @@ export function getClaudeJsonlRoots(): string[] {
   ];
 }
 
-async function listJsonlFiles(): Promise<string[]> {
+async function listJsonlFilesWithMtime(): Promise<{ path: string; mtimeMs: number }[]> {
   const roots = getClaudeJsonlRoots();
-  const out: string[] = [];
+  const out: { path: string; mtimeMs: number }[] = [];
   const seen = new Set<string>();
   for (const root of roots) {
     try {
-      // node 22+ glob
-      // @ts-expect-error glob is generator
       for await (const file of glob("**/*.jsonl", { cwd: root, withFileTypes: false })) {
         const abs = resolve(root, String(file));
-        if (!seen.has(abs)) {
-          seen.add(abs);
-          out.push(abs);
+        if (seen.has(abs)) continue;
+        seen.add(abs);
+        try {
+          const s = await stat(abs);
+          out.push({ path: abs, mtimeMs: s.mtimeMs });
+        } catch {
+          // skip
         }
       }
     } catch {
-      // root missing, skip
+      // root missing
     }
   }
+  out.sort((a, b) => b.mtimeMs - a.mtimeMs);
   return out;
 }
 
@@ -178,18 +181,33 @@ function passesFilters(ns: NormalizedSession, opts: LoadOpts): boolean {
 }
 
 export const loadClaudeSessions: import("../data/types.js").SourceLoader = async (opts) => {
-  const files = await listJsonlFiles();
+  const files = await listJsonlFilesWithMtime();
   const out: NormalizedSession[] = [];
-  for (const file of files) {
-    const personality = await extractClaudePersonality(file);
+  const sinceMs = typeof opts.sinceMs === "number" ? opts.sinceMs : null;
+  const wantSession = opts.sessionId;
+  const wantBranch = opts.branch;
+  const wantCwd = opts.cwd;
+  const limit =
+    typeof opts.limit === "number"
+      ? opts.limit
+      : wantSession
+        ? 50 // small cap when filtering by session id
+        : sinceMs === null && !wantBranch && !wantCwd
+          ? 1 // default-mode picker only needs the most recent
+          : Number.POSITIVE_INFINITY;
+
+  for (const { path, mtimeMs } of files) {
+    // Early exit by sinceMs (files are sorted by mtime desc).
+    if (sinceMs !== null && mtimeMs < sinceMs) break;
+    const personality = await extractClaudePersonality(path);
     if (!personality.sessionId) continue;
     const ns = personalityToNormalized(personality);
     if (!passesFilters(ns, opts)) continue;
-    const merged = await mergeWithCcusage(ns, file);
+    const merged = await mergeWithCcusage(ns, path);
     out.push(merged);
+    if (out.length >= limit) break;
   }
   out.sort((a, b) => new Date(b.endUtc).getTime() - new Date(a.endUtc).getTime());
-  if (typeof opts.limit === "number") return out.slice(0, opts.limit);
   return out;
 };
 

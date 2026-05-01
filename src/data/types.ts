@@ -1,5 +1,7 @@
 import type { Source, Subagent, ToolStat, TopFile } from "./receipt-schema.js";
 
+export type { Source } from "./receipt-schema.js";
+
 /**
  * Internal cross-source representation. One per JSONL session.
  * Adapters (extract/claude.ts, extract/codex.ts) emit this shape.

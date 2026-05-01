@@ -1,4 +1,4 @@
-import satori from "satori";
+import satori, { type SatoriOptions } from "satori";
 import { Resvg } from "@resvg/resvg-js";
 import * as React from "react";
 import type { Receipt } from "../data/receipt-schema.js";
@@ -14,9 +14,17 @@ export interface RenderPngOpts {
   size: SizePreset;
 }
 
+function satoriFonts(): SatoriOptions["fonts"] {
+  return loadFonts().map((f) => ({
+    name: f.name,
+    data: f.data,
+    weight: f.weight as 400 | 700,
+    style: f.style,
+  }));
+}
+
 export async function renderPng(opts: RenderPngOpts): Promise<Buffer> {
   const dim = SIZES[opts.size];
-  const fonts = loadFonts();
   const element = React.createElement(VibeCard, {
     receipt: opts.receipt,
     s: opts.s,
@@ -25,12 +33,12 @@ export async function renderPng(opts: RenderPngOpts): Promise<Buffer> {
   const svg = await satori(element, {
     width: dim.width,
     height: dim.height,
-    fonts,
+    fonts: satoriFonts(),
   });
   const resvg = new Resvg(svg, {
     fitTo: { mode: "original" },
     font: {
-      fontBuffers: fonts.map((f) => f.data),
+      loadSystemFonts: false,
       defaultFontFamily: "JetBrainsMono",
     },
   });
@@ -40,7 +48,6 @@ export async function renderPng(opts: RenderPngOpts): Promise<Buffer> {
 
 export async function renderSvg(opts: RenderPngOpts): Promise<string> {
   const dim = SIZES[opts.size];
-  const fonts = loadFonts();
   const element = React.createElement(VibeCard, {
     receipt: opts.receipt,
     s: opts.s,
@@ -49,6 +56,6 @@ export async function renderSvg(opts: RenderPngOpts): Promise<string> {
   return satori(element, {
     width: dim.width,
     height: dim.height,
-    fonts,
+    fonts: satoriFonts(),
   });
 }

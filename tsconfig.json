@@ -19,7 +19,6 @@
     "declaration": false,
     "sourceMap": true,
     "outDir": "dist",
-    "rootDir": "src",
     "types": ["node"]
   },
   "include": ["src/**/*", "tests/**/*"],

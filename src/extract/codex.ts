@@ -1,4 +1,4 @@
-import { glob } from "node:fs/promises";
+import { glob, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { extractCodexPersonality } from "./personality/codex-jsonl.js";
@@ -43,17 +43,23 @@ export function getCodexJsonlRoot(): string {
     : resolve(homedir(), ".codex", "sessions");
 }
 
-async function listJsonlFiles(): Promise<string[]> {
+async function listJsonlFilesWithMtime(): Promise<{ path: string; mtimeMs: number }[]> {
   const root = getCodexJsonlRoot();
-  const out: string[] = [];
+  const out: { path: string; mtimeMs: number }[] = [];
   try {
-    // @ts-expect-error glob is generator
     for await (const file of glob("**/*.jsonl", { cwd: root, withFileTypes: false })) {
-      out.push(resolve(root, String(file)));
+      const abs = resolve(root, String(file));
+      try {
+        const s = await stat(abs);
+        out.push({ path: abs, mtimeMs: s.mtimeMs });
+      } catch {
+        // skip
+      }
     }
   } catch {
     // root missing
   }
+  out.sort((a, b) => b.mtimeMs - a.mtimeMs);
   return out;
 }
 
@@ -68,9 +74,22 @@ function passesFilters(ns: NormalizedSession, opts: LoadOpts): boolean {
 }
 
 export const loadCodexSessions: SourceLoader = async (opts) => {
-  const files = await listJsonlFiles();
+  const files = await listJsonlFilesWithMtime();
   const out: NormalizedSession[] = [];
-  for (const file of files) {
+  const sinceMs = typeof opts.sinceMs === "number" ? opts.sinceMs : null;
+  const wantSession = opts.sessionId;
+  const wantCwd = opts.cwd;
+  const limit =
+    typeof opts.limit === "number"
+      ? opts.limit
+      : wantSession
+        ? 50
+        : sinceMs === null && !wantCwd
+          ? 1
+          : Number.POSITIVE_INFINITY;
+
+  for (const { path: file, mtimeMs } of files) {
+    if (sinceMs !== null && mtimeMs < sinceMs) break;
     const p = await extractCodexPersonality(file);
     if (!p.sessionId) continue;
     const model = p.models[0] ?? "default";
@@ -125,9 +144,9 @@ export const loadCodexSessions: SourceLoader = async (opts) => {
     };
     if (!passesFilters(ns, opts)) continue;
     out.push(ns);
+    if (out.length >= limit) break;
   }
   out.sort((a, b) => new Date(b.endUtc).getTime() - new Date(a.endUtc).getTime());
-  if (typeof opts.limit === "number") return out.slice(0, opts.limit);
   return out;
 };
 
