@@ -1,0 +1,51 @@
+export const en = {
+  masthead: "VIBE RECEIPT",
+  tagline: "monospace receipt",
+  badgeSession: "session",
+  badgeCombined: "combined",
+  badgeToday: "today",
+  badgeWeek: "this week",
+  badgeYear: "year",
+  inFlight: "· in flight",
+
+  sectionSession: "SESSION",
+  sectionWork: "WORK",
+  sectionTools: "TOP TOOLS",
+  sectionSubagents: "SUBAGENTS",
+  sectionPersonality: "PERSONALITY",
+  sectionFirstPrompt: "FIRST PROMPT",
+
+  labelDuration: "duration",
+  labelWallWindow: "wall window",
+  labelActiveTime: "active time",
+  labelModel: "model",
+  labelTokens: "tokens",
+  labelCost: "cost",
+  labelCacheHit: "cache hit",
+
+  labelFiles: "files touched",
+  labelLinesAdded: "lines added",
+  labelLinesRemoved: "lines removed",
+  labelBash: "bash commands",
+  labelWeb: "web fetches",
+  labelUserMod: "user-edited",
+  labelSessions: "sessions",
+
+  labelAfk: "afk",
+  labelEsc: "esc-rage",
+  labelPerm: "permission flips",
+  labelYolo: "yolo mode",
+  labelDeep: "deep thought",
+  labelSkills: "skills",
+  labelSlash: "slash",
+  labelTruncated: "truncated",
+  labelHookErrors: "hook errors",
+
+  fpUnit: "words",
+  fpFooterShaPrefix: "sha:",
+
+  footerGen: "generated with vibe-receipt",
+  footerRepo: "github.com/loris307/vibe-receipt",
+  combineHint: "active time across parallel sessions",
+};
+export type Strings = typeof en;

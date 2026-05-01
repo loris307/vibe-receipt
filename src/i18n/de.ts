@@ -1,0 +1,52 @@
+import type { Strings } from "./en.js";
+
+export const de: Strings = {
+  masthead: "VIBE BON",
+  tagline: "monospace bon",
+  badgeSession: "session",
+  badgeCombined: "kombiniert",
+  badgeToday: "heute",
+  badgeWeek: "diese woche",
+  badgeYear: "jahr",
+  inFlight: "· läuft noch",
+
+  sectionSession: "SESSION",
+  sectionWork: "ARBEIT",
+  sectionTools: "TOP TOOLS",
+  sectionSubagents: "SUB-AGENTS",
+  sectionPersonality: "CHARAKTER",
+  sectionFirstPrompt: "ERSTER PROMPT",
+
+  labelDuration: "dauer",
+  labelWallWindow: "fenster",
+  labelActiveTime: "aktiv",
+  labelModel: "modell",
+  labelTokens: "tokens",
+  labelCost: "kosten",
+  labelCacheHit: "cache-hit",
+
+  labelFiles: "dateien",
+  labelLinesAdded: "zeilen +",
+  labelLinesRemoved: "zeilen −",
+  labelBash: "bash-cmds",
+  labelWeb: "web-fetches",
+  labelUserMod: "user-edits",
+  labelSessions: "sessions",
+
+  labelAfk: "afk",
+  labelEsc: "esc-rage",
+  labelPerm: "perm-flips",
+  labelYolo: "yolo-modus",
+  labelDeep: "tiefer gedanke",
+  labelSkills: "skills",
+  labelSlash: "slash",
+  labelTruncated: "abgeschnitten",
+  labelHookErrors: "hook-fehler",
+
+  fpUnit: "wörter",
+  fpFooterShaPrefix: "sha:",
+
+  footerGen: "erstellt mit vibe-receipt",
+  footerRepo: "github.com/loris307/vibe-receipt",
+  combineHint: "aktive zeit über parallele sessions",
+};
