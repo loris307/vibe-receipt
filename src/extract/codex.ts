@@ -90,8 +90,12 @@ export const loadCodexSessions: SourceLoader = async (opts) => {
 
   for (const { path: file, mtimeMs } of files) {
     if (sinceMs !== null && mtimeMs < sinceMs) break;
-    const p = await extractCodexPersonality(file);
+    const p =
+      sinceMs !== null
+        ? await extractCodexPersonality(file, { sinceMs })
+        : await extractCodexPersonality(file);
     if (!p.sessionId) continue;
+    if (sinceMs !== null && p.durationMs === 0) continue;
     const model = p.models[0] ?? "default";
     const totalCostUsd = computeCostUsd({
       model,

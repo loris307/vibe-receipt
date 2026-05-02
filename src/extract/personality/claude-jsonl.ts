@@ -132,10 +132,25 @@ function isRealUserPrompt(evt: any): { real: string } | null {
   return { real };
 }
 
+export interface ExtractOpts {
+  /** If set, ignore events with timestamp < sinceMs. */
+  sinceMs?: number;
+}
+
 export async function extractClaudePersonality(
   filePath: string,
+  opts: ExtractOpts = {},
 ): Promise<ClaudePersonality> {
-  const events = await readJsonlAll<any>(filePath);
+  const allEvents = await readJsonlAll<any>(filePath);
+  const events =
+    typeof opts.sinceMs === "number"
+      ? allEvents.filter((e) => {
+          const ts = e?.timestamp;
+          if (typeof ts !== "string") return false;
+          const t = new Date(ts).getTime();
+          return Number.isFinite(t) && t >= opts.sinceMs!;
+        })
+      : allEvents;
 
   const out: ClaudePersonality = {
     sessionId: null,

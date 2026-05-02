@@ -71,8 +71,24 @@ function eventTimestamp(evt: any): number | null {
   return Number.isFinite(t) ? t : null;
 }
 
-export async function extractCodexPersonality(filePath: string): Promise<CodexPersonality> {
-  const events = await readJsonlAll<any>(filePath);
+export interface ExtractOpts {
+  sinceMs?: number;
+}
+
+export async function extractCodexPersonality(
+  filePath: string,
+  opts: ExtractOpts = {},
+): Promise<CodexPersonality> {
+  const allEvents = await readJsonlAll<any>(filePath);
+  const events =
+    typeof opts.sinceMs === "number"
+      ? allEvents.filter((e) => {
+          const ts = e?.payload?.timestamp ?? e?.timestamp;
+          if (typeof ts !== "string") return false;
+          const t = new Date(ts).getTime();
+          return Number.isFinite(t) && t >= opts.sinceMs!;
+        })
+      : allEvents;
 
   const out: CodexPersonality = {
     sessionId: null,

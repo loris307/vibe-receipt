@@ -106,7 +106,10 @@ function personalityToNormalized(p: Awaited<ReturnType<typeof extractClaudePerso
  * Sums input/output/cache_creation/cache_read tokens across distinct (msg.id, requestId) pairs.
  * Cost = 0 in fallback (we'd need pricing table; ccusage handles it when used).
  */
-async function fallbackTokenSum(filePath: string): Promise<{
+async function fallbackTokenSum(
+  filePath: string,
+  sinceMs?: number,
+): Promise<{
   inputTokens: number;
   outputTokens: number;
   cacheCreateTokens: number;
@@ -120,6 +123,12 @@ async function fallbackTokenSum(filePath: string): Promise<{
   let cacheReadTokens = 0;
   for (const evt of events) {
     if (evt?.type !== "assistant") continue;
+    if (typeof sinceMs === "number") {
+      const ts = evt?.timestamp;
+      if (typeof ts !== "string") continue;
+      const t = new Date(ts).getTime();
+      if (!Number.isFinite(t) || t < sinceMs) continue;
+    }
     const usage = evt?.message?.usage;
     if (!usage || typeof usage !== "object") continue;
     const id = `${evt.message?.id ?? ""}::${evt.requestId ?? ""}`;
@@ -146,15 +155,18 @@ async function fallbackTokenSum(filePath: string): Promise<{
 async function mergeTokensAndCost(
   ns: NormalizedSession,
   filePath: string,
+  sinceMs?: number,
 ): Promise<NormalizedSession> {
-  const fb = await fallbackTokenSum(filePath);
+  const fb = await fallbackTokenSum(filePath, sinceMs);
   let inputTokens = fb.inputTokens;
   let outputTokens = fb.outputTokens;
   let cacheCreateTokens = fb.cacheCreateTokens;
   let cacheReadTokens = fb.cacheReadTokens;
   let ccusageCost = 0;
 
-  try {
+  // ccusage's loadSessionUsageById has no time-window awareness — only call it for
+  // un-clipped (whole-session) extractions; otherwise our in-window fallback is the truth.
+  if (typeof sinceMs !== "number") try {
     const mod: any = await import("ccusage/data-loader");
     const loadById = mod.loadSessionUsageById;
     if (typeof loadById === "function") {
@@ -229,11 +241,21 @@ export const loadClaudeSessions: import("../data/types.js").SourceLoader = async
   for (const { path, mtimeMs } of files) {
     // Early exit by sinceMs (files are sorted by mtime desc).
     if (sinceMs !== null && mtimeMs < sinceMs) break;
-    const personality = await extractClaudePersonality(path);
+    const personality =
+      sinceMs !== null
+        ? await extractClaudePersonality(path, { sinceMs })
+        : await extractClaudePersonality(path);
     if (!personality.sessionId) continue;
+    // After event-level filtering, a "session" can be empty if no events fell in window.
+    if (sinceMs !== null && personality.promptLengths.length === 0 && personality.durationMs === 0)
+      continue;
     const ns = personalityToNormalized(personality);
     if (!passesFilters(ns, opts)) continue;
-    const merged = await mergeTokensAndCost(ns, path);
+    const merged = await mergeTokensAndCost(
+      ns,
+      path,
+      sinceMs !== null ? sinceMs : undefined,
+    );
     out.push(merged);
     if (out.length >= limit) break;
   }

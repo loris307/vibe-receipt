@@ -9,7 +9,8 @@ export interface SizeSpec {
 }
 
 export const SIZES: Record<SizePreset, SizeSpec> = {
-  portrait: { width: 1080, height: 1350 },
+  // 1080×1500 — slightly taller than IG-feed 4:5 to fit the full PROMPTING section.
+  portrait: { width: 1080, height: 1500 },
   story: { width: 1080, height: 1920 },
   og: { width: 1200, height: 630, paddingX: 48, paddingY: 36 },
 };
