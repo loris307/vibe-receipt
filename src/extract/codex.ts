@@ -124,7 +124,7 @@ export const loadCodexSessions: SourceLoader = async (opts) => {
       afkRecaps: [],
 
       filesTouched: p.filesTouched,
-      topFiles: p.topFiles,
+      fileEntries: p.fileEntries,
       linesAdded: p.linesAdded,
       linesRemoved: p.linesRemoved,
       bashCommands: p.bashCommands,
@@ -186,7 +186,7 @@ export async function loadCodexFromFile(filePath: string): Promise<NormalizedSes
     afkRecaps: [],
 
     filesTouched: p.filesTouched,
-    topFiles: p.topFiles,
+    fileEntries: p.fileEntries,
     linesAdded: p.linesAdded,
     linesRemoved: p.linesRemoved,
     bashCommands: p.bashCommands,

@@ -29,7 +29,9 @@ export interface NormalizedSession {
   afkRecaps: string[];
 
   filesTouched: string[];
-  topFiles: TopFile[];
+  /** ALL files edited in this session, with per-file +/- counts. Aggregator slices to top N
+   *  for the receipt; combiner unions across sessions. */
+  fileEntries: TopFile[];
   linesAdded: number;
   linesRemoved: number;
   bashCommands: number;

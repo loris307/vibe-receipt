@@ -20,7 +20,7 @@ export interface CodexPersonality {
   reasoningOutputTokens: number;
 
   filesTouched: string[];
-  topFiles: TopFile[];
+  fileEntries: TopFile[];
   linesAdded: number;
   linesRemoved: number;
   bashCommands: number;
@@ -103,7 +103,7 @@ export async function extractCodexPersonality(
     outputTokens: 0,
     reasoningOutputTokens: 0,
     filesTouched: [],
-    topFiles: [],
+    fileEntries: [],
     linesAdded: 0,
     linesRemoved: 0,
     bashCommands: 0,
@@ -236,11 +236,12 @@ export async function extractCodexPersonality(
     .map(([path, p]) => ({ path, added: p.added, removed: p.removed }))
     .sort((a, b) => b.added + b.removed - (a.added + a.removed));
   out.filesTouched = fileEntries.map((f) => f.path);
-  out.topFiles = fileEntries.slice(0, TOP_FILES_LIMIT);
+  out.fileEntries = fileEntries;
   for (const f of fileEntries) {
     out.linesAdded += f.added;
     out.linesRemoved += f.removed;
   }
+  void TOP_FILES_LIMIT;
 
   return out;
 }

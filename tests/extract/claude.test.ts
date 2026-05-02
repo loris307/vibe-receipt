@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 
 const SHORT = resolve(__dirname, "../fixtures/claude/short-session.jsonl");
 const MULTI = resolve(__dirname, "../fixtures/claude/multi-model.jsonl");
+const EDITS = resolve(__dirname, "../fixtures/claude/file-edits.jsonl");
 
 describe("extractClaudePersonality (short-session fixture)", () => {
   it("captures session metadata", async () => {
@@ -98,5 +99,29 @@ describe("multi-model fixture", () => {
     expect(p.models).toContain("claude-haiku-4-5");
     expect(p.models).toContain("claude-sonnet-4-6");
     expect(p.branch).toBe("feature/multi-model");
+  });
+});
+
+describe("file-edits fixture (Write + Edit, both shapes)", () => {
+  it("counts Write/create lines from `content` when structuredPatch is empty", async () => {
+    const p = await extractClaudePersonality(EDITS);
+    // Write creates new.ts with 4 lines (line1\nline2\nline3\nline4 → 4 lines)
+    // Edit then changes line2 → +2/-1
+    // Total expected: +4 (write) + 2 (edit add) - 1 (edit remove) = +6/-1
+    expect(p.linesAdded).toBe(6);
+    expect(p.linesRemoved).toBe(1);
+    expect(p.filesTouched).toEqual(["/x/new.ts"]);
+  });
+
+  it("recognizes Edit results that have no `type` field (only oldString/newString)", async () => {
+    const p = await extractClaudePersonality(EDITS);
+    // Both tool calls counted in toolCounts
+    expect(p.toolCounts.Write).toBe(1);
+    expect(p.toolCounts.Edit).toBe(1);
+    // The single file appears in topFiles regardless of result shape
+    expect(p.fileEntries).toHaveLength(1);
+    expect(p.fileEntries[0]?.path).toBe("/x/new.ts");
+    expect(p.fileEntries[0]?.added).toBe(6);
+    expect(p.fileEntries[0]?.removed).toBe(1);
   });
 });

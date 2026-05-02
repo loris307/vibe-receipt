@@ -89,7 +89,7 @@ function personalityToNormalized(p: Awaited<ReturnType<typeof extractClaudePerso
     afkRecaps: p.afkRecaps,
 
     filesTouched: p.filesTouched,
-    topFiles: p.topFiles,
+    fileEntries: p.fileEntries,
     linesAdded: p.linesAdded,
     linesRemoved: p.linesRemoved,
     bashCommands: p.bashCommands,

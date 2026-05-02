@@ -20,7 +20,7 @@ export interface ClaudePersonality {
   afkRecaps: string[];
 
   filesTouched: string[];
-  topFiles: TopFile[];
+  fileEntries: TopFile[];
   linesAdded: number;
   linesRemoved: number;
   bashCommands: number;
@@ -166,7 +166,7 @@ export async function extractClaudePersonality(
     afkRecaps: [],
 
     filesTouched: [],
-    topFiles: [],
+    fileEntries: [],
     linesAdded: 0,
     linesRemoved: 0,
     bashCommands: 0,
@@ -280,23 +280,51 @@ export async function extractClaudePersonality(
       const content = evt.message?.content;
       const isToolResult = Array.isArray(content) && content.some((c: any) => c?.type === "tool_result");
       if (isToolResult && tur && typeof tur === "object") {
-        const tType = tur.type;
-        if (tType === "create" || tType === "update") {
-          if (typeof tur.filePath === "string") {
-            const fp = tur.filePath;
-            if (!filePatchById.has(fp)) filePatchById.set(fp, { added: 0, removed: 0 });
-            const acc = filePatchById.get(fp)!;
-            const patches = Array.isArray(tur.structuredPatch) ? tur.structuredPatch : [];
-            for (const hunk of patches) {
-              const lines: string[] = Array.isArray(hunk?.lines) ? hunk.lines : [];
-              for (const ln of lines) {
-                if (typeof ln !== "string") continue;
-                if (ln.startsWith("+")) acc.added += 1;
-                else if (ln.startsWith("-")) acc.removed += 1;
+        // Detect file-edit results by SHAPE (not by `type` field — Edit's
+        // toolUseResult has no `type` at all; Write has type:"create" with
+        // empty structuredPatch + populated `content`).
+        const isFileEditResult =
+          typeof tur.filePath === "string" &&
+          (Array.isArray(tur.structuredPatch) ||
+            typeof tur.content === "string" ||
+            typeof tur.oldString === "string" ||
+            typeof tur.newString === "string");
+
+        if (isFileEditResult) {
+          const fp = tur.filePath;
+          if (!filePatchById.has(fp)) filePatchById.set(fp, { added: 0, removed: 0 });
+          const acc = filePatchById.get(fp)!;
+
+          let added = 0;
+          let removed = 0;
+          let patchHasLines = false;
+          const patches = Array.isArray(tur.structuredPatch) ? tur.structuredPatch : [];
+          for (const hunk of patches) {
+            const lines: string[] = Array.isArray(hunk?.lines) ? hunk.lines : [];
+            for (const ln of lines) {
+              if (typeof ln !== "string") continue;
+              if (ln.startsWith("+")) {
+                added += 1;
+                patchHasLines = true;
+              } else if (ln.startsWith("-")) {
+                removed += 1;
+                patchHasLines = true;
               }
             }
-            if (tur.userModified === true) out.userModified += 1;
           }
+
+          // Fallback for new-file Write: type:"create", empty structuredPatch,
+          // full file content in `content`. Count lines in content.
+          if (!patchHasLines && typeof tur.content === "string" && tur.content) {
+            const isNewFile = tur.type === "create" || !tur.originalFile;
+            if (isNewFile) {
+              added = (tur.content.match(/\n/g)?.length ?? 0) + 1;
+            }
+          }
+
+          acc.added += added;
+          acc.removed += removed;
+          if (tur.userModified === true) out.userModified += 1;
         } else if (tur.interrupted === true) {
           out.escInterrupts += 1;
         } else if (tur.agentType && typeof tur.totalDurationMs === "number") {
@@ -357,16 +385,17 @@ export async function extractClaudePersonality(
     }
   }
 
-  // Resolve top-files
+  // Resolve files — keep ALL of them (combine + render slice top N from this list).
   const fileEntries = Array.from(filePatchById.entries())
     .map(([path, p]) => ({ path, added: p.added, removed: p.removed }))
     .sort((a, b) => b.added + b.removed - (a.added + a.removed));
   out.filesTouched = fileEntries.map((f) => f.path);
-  out.topFiles = fileEntries.slice(0, TOP_FILES_LIMIT);
+  out.fileEntries = fileEntries;
   for (const f of fileEntries) {
     out.linesAdded += f.added;
     out.linesRemoved += f.removed;
   }
+  void TOP_FILES_LIMIT;
 
   // Models, sorted by first-seen
   out.models = Array.from(modelSet);

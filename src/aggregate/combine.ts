@@ -85,7 +85,7 @@ export function buildCombinedReceipt(
     cacheReadTokens += s.cacheReadTokens;
     totalUsd += s.totalCostUsd;
 
-    for (const f of s.topFiles) {
+    for (const f of s.fileEntries) {
       const cur = fileMap.get(f.path);
       if (cur) {
         cur.added += f.added;

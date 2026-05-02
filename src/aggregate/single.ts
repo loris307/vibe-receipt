@@ -44,8 +44,8 @@ export function buildSingleReceipt(ns: NormalizedSession): Receipt {
     },
 
     work: {
-      filesTouched: ns.filesTouched.length,
-      topFiles: ns.topFiles,
+      filesTouched: ns.fileEntries.length,
+      topFiles: ns.fileEntries.slice(0, 5),
       linesAdded: ns.linesAdded,
       linesRemoved: ns.linesRemoved,
       bashCommands: ns.bashCommands,
