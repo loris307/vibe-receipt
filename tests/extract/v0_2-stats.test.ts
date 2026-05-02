@@ -9,6 +9,13 @@ import {
   computeCostPerLine,
   computeMostEditedFile,
 } from "../../src/aggregate/derive-stats.js";
+import {
+  pickArchetype,
+  scoreAllArchetypes,
+  type ArchetypeFeatures,
+} from "../../src/aggregate/archetype.js";
+import { deriveAchievements } from "../../src/aggregate/achievements.js";
+import type { Receipt } from "../../src/data/receipt-schema.js";
 
 async function makeFixture(events: unknown[]): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "vibe-receipt-test-"));
@@ -341,6 +348,253 @@ describe("burn rate peak", () => {
       { ts: t0, tokens: 100 },
     ]);
     expect(r.tpm).toBe(300);
+  });
+});
+
+function feat(over: Partial<ArchetypeFeatures> = {}): ArchetypeFeatures {
+  return {
+    promptCount: 10,
+    avgPromptChars: 100,
+    promptsWithPath: 0,
+    promptsWithCodeBlock: 0,
+    promptsWithBugKeyword: 0,
+    toolTotal: 50,
+    readishTools: 10,
+    editTools: 10,
+    bashTools: 5,
+    longestSoloMs: 0,
+    durationMs: 600_000,
+    escInterrupts: 0,
+    rateLimitHits: 0,
+    startHourLocal: 14, // afternoon — neutral
+    ...over,
+  };
+}
+
+describe("archetype scoring", () => {
+  it("picks vibe-coder for empty/tiny session", () => {
+    const f = feat({ promptCount: 0, toolTotal: 0 });
+    const scores = scoreAllArchetypes(f);
+    expect(pickArchetype(scores)).toBe("vibe-coder");
+  });
+
+  it("identifies the Specifier (long prompts, paths)", () => {
+    const f = feat({ avgPromptChars: 500, promptsWithPath: 8 });
+    const scores = scoreAllArchetypes(f);
+    expect(scores.specifier).toBeGreaterThan(0.5);
+    expect(pickArchetype(scores)).toBe("specifier");
+  });
+
+  it("identifies the Vibe-Coder (very short prompts, no code)", () => {
+    const f = feat({ avgPromptChars: 25, promptsWithCodeBlock: 0 });
+    const scores = scoreAllArchetypes(f);
+    expect(scores["vibe-coder"]).toBeGreaterThan(0.5);
+  });
+
+  it("identifies the Fixer (bug keywords in prompts)", () => {
+    const f = feat({ promptsWithBugKeyword: 7, promptCount: 10 });
+    const scores = scoreAllArchetypes(f);
+    expect(scores.fixer).toBeGreaterThan(0.5);
+  });
+
+  it("identifies the Researcher (read-heavy, edit-light)", () => {
+    const f = feat({ readishTools: 40, editTools: 2, toolTotal: 50 });
+    const scores = scoreAllArchetypes(f);
+    expect(scores.researcher).toBeGreaterThan(0.4);
+  });
+
+  it("identifies the Firefighter (rate limits + escs)", () => {
+    const f = feat({ rateLimitHits: 5, escInterrupts: 10 });
+    const scores = scoreAllArchetypes(f);
+    expect(scores.firefighter).toBeGreaterThan(0.5);
+  });
+
+  it("identifies the Trustfall Pilot (long solo + low intervention)", () => {
+    const f = feat({ longestSoloMs: 10 * 60_000, promptCount: 3, durationMs: 1800_000 });
+    const scores = scoreAllArchetypes(f);
+    expect(scores["trustfall-pilot"]).toBeGreaterThan(0.5);
+  });
+
+  it("identifies the ESC-Rager", () => {
+    const f = feat({ escInterrupts: 6, promptCount: 10 });
+    const scores = scoreAllArchetypes(f);
+    expect(scores["esc-rager"]).toBeGreaterThan(0.5);
+  });
+
+  it("identifies the Night Owl (start hour 02:00)", () => {
+    const f = feat({ startHourLocal: 2 });
+    const scores = scoreAllArchetypes(f);
+    expect(scores["night-owl"]).toBe(1);
+  });
+
+  it("does NOT classify as Night Owl at 14:00", () => {
+    const f = feat({ startHourLocal: 14 });
+    const scores = scoreAllArchetypes(f);
+    expect(scores["night-owl"]).toBe(0);
+  });
+
+  it("PRIORITY tie-break — fixer > researcher when both perfect", () => {
+    // construct artificial tie at score=1 for fixer + researcher
+    const scores = {
+      specifier: 0,
+      "vibe-coder": 0,
+      fixer: 1,
+      researcher: 1,
+      firefighter: 0,
+      "trustfall-pilot": 0,
+      "esc-rager": 0,
+      "night-owl": 0,
+    } as const;
+    expect(pickArchetype(scores)).toBe("fixer");
+  });
+});
+
+function makeReceipt(over: Partial<Receipt> = {}): Receipt {
+  const base: Receipt = {
+    scope: { kind: "single", sessionId: "x" },
+    generatedAt: "2026-05-02T12:00:00Z",
+    meta: { project: "p", branch: null, sources: ["claude"], sessionCount: 1 },
+    time: {
+      startUtc: "2026-05-02T12:00:00Z",
+      endUtc: "2026-05-02T13:00:00Z",
+      durationMs: 3600_000,
+      activeMs: 1800_000,
+      afkMs: 1800_000,
+      afkRecaps: [],
+      longestSoloStretchMs: 0,
+      longestSoloStretchStartUtc: null,
+      longestSoloStretchEndUtc: null,
+    },
+    cost: {
+      totalUsd: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheCreateTokens: 0,
+      cacheReadTokens: 0,
+      cacheHitRatio: 0,
+      models: [],
+      rateLimitHits: 0,
+      rateLimitWaitMs: 0,
+      burnRatePeakTokensPerMin: 0,
+      burnRatePeakWindowUtc: null,
+      costPerLineUsd: 0,
+    },
+    work: {
+      filesTouched: 0,
+      topFiles: [],
+      linesAdded: 0,
+      linesRemoved: 0,
+      bashCommands: 0,
+      webFetches: 0,
+      userModified: 0,
+      mostEditedFile: null,
+    },
+    tools: { total: 0, top: [] },
+    subagents: [],
+    personality: {
+      escInterrupts: 0,
+      permissionFlips: 0,
+      yoloEvents: 0,
+      thinkingMs: 0,
+      skills: [],
+      slashCommands: [],
+      truncatedOutputs: 0,
+      hookErrors: 0,
+      longestUserMsgChars: 0,
+      promptCount: 0,
+      longestPromptChars: 0,
+      shortestPromptChars: 0,
+      avgPromptChars: 0,
+      shortestPromptText: null,
+      waitThenGoCount: 0,
+      politenessScore: { please: 0, thanks: 0, sorry: 0, total: 0 },
+    },
+    firstPrompt: {
+      wordCount: 0,
+      charCount: 0,
+      moodEmoji: "",
+      fingerprintSha: "",
+      preview: null,
+      revealed: null,
+    },
+    archetype: { key: "vibe-coder", taglineKey: "x", scores: {} },
+    comparison: null,
+    achievements: [],
+    ...over,
+  };
+  return base;
+}
+
+describe("achievement badges", () => {
+  it("returns [] for an empty session", () => {
+    const r = makeReceipt({
+      time: {
+        ...makeReceipt().time,
+        startUtc: "2026-05-02T14:00:00Z", // afternoon
+      },
+    });
+    expect(deriveAchievements(r)).toEqual([]);
+  });
+
+  it("triggers token-millionaire at >= 1M tokens", () => {
+    const r = makeReceipt({
+      cost: { ...makeReceipt().cost, inputTokens: 600_000, outputTokens: 500_000 },
+      time: { ...makeReceipt().time, startUtc: "2026-05-02T14:00:00Z" },
+    });
+    const a = deriveAchievements(r);
+    expect(a[0]?.key).toBe("token-millionaire");
+  });
+
+  it("caps at 3 badges (rarest first)", () => {
+    const r = makeReceipt({
+      cost: {
+        ...makeReceipt().cost,
+        inputTokens: 600_000,
+        outputTokens: 500_000,
+        totalUsd: 50, // big-spender
+      },
+      time: {
+        ...makeReceipt().time,
+        durationMs: 4 * 3600_000, // marathoner
+        startUtc: "2026-05-02T22:00:00Z", // night-owl too
+      },
+      personality: {
+        ...makeReceipt().personality,
+        politenessScore: { please: 5, thanks: 5, sorry: 0, total: 10 }, // polite
+      },
+    });
+    const a = deriveAchievements(r);
+    expect(a.length).toBe(3);
+    // rarest first — token-millionaire ahead of marathoner ahead of night-owl
+    expect(a[0]?.key).toBe("token-millionaire");
+    expect(a.map((x) => x.key)).toContain("big-spender");
+    expect(a.map((x) => x.key)).toContain("marathoner");
+    // polite shouldn't make the cut at 3
+    expect(a.map((x) => x.key)).not.toContain("polite");
+  });
+
+  it("triggers night-owl for 02:00 start", () => {
+    const r = makeReceipt({
+      time: { ...makeReceipt().time, startUtc: "2026-05-02T02:30:00Z" },
+    });
+    const a = deriveAchievements(r);
+    expect(a.map((x) => x.key)).toContain("night-owl");
+  });
+
+  it("triggers no-error-streak ONLY when zero rate-limits, zero ESCs, >30min, and engagement", () => {
+    const r = makeReceipt({
+      time: { ...makeReceipt().time, durationMs: 45 * 60_000, startUtc: "2026-05-02T14:00:00Z" },
+      tools: { total: 5, top: [] },
+    });
+    const a = deriveAchievements(r);
+    expect(a.map((x) => x.key)).toContain("no-error-streak");
+
+    const r2 = makeReceipt({
+      time: { ...makeReceipt().time, durationMs: 45 * 60_000, startUtc: "2026-05-02T14:00:00Z" },
+      tools: { total: 5, top: [] },
+      cost: { ...makeReceipt().cost, rateLimitHits: 1 },
+    });
+    expect(deriveAchievements(r2).map((x) => x.key)).not.toContain("no-error-streak");
   });
 });
 

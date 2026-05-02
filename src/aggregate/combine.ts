@@ -10,6 +10,7 @@ import {
   computeMostEditedFile,
   type TokenEvent,
 } from "./derive-stats.js";
+import { deriveAchievements } from "./achievements.js";
 
 const TOP_FILES_LIMIT = 5;
 const TOOL_LIMIT = 5;
@@ -202,7 +203,7 @@ export function buildCombinedReceipt(
   const fp = computeFirstPromptFingerprint(firstPromptCandidate?.text ?? null);
   const burn = computeBurnRatePeak(allTokenEvents);
 
-  return {
+  const result: Receipt = {
     scope,
     generatedAt: new Date().toISOString(),
     meta: {
@@ -284,4 +285,7 @@ export function buildCombinedReceipt(
     comparison: null,
     achievements: [],
   };
+  // Achievements work on aggregate receipt — same rules apply.
+  result.achievements = deriveAchievements(result);
+  return result;
 }

@@ -558,7 +558,7 @@ JSON-only in this phase. Render kommt später.
 
 ---
 
-## Phase 6 — Archetype
+## Phase 6 — Archetype ✅ DONE
 
 **Depends on Phases 2 + 3.** (Specifier braucht prompt-stats, Researcher braucht tool-counts, Trustfall braucht longest-solo, etc.)
 
@@ -712,7 +712,7 @@ Medium. Scoring-Formeln sind opinionated und brauchen Tuning auf real corpus. **
 
 ---
 
-## Phase 7 — Achievement badges
+## Phase 7 — Achievement badges ✅ DONE
 
 **Depends on Phases 2-6.**
 

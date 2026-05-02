@@ -9,6 +9,8 @@ import {
   computeCostPerLine,
   computeMostEditedFile,
 } from "./derive-stats.js";
+import { deriveArchetype } from "./archetype.js";
+import { deriveAchievements } from "./achievements.js";
 
 export function buildSingleReceipt(ns: NormalizedSession): Receipt {
   const scope: ReceiptScope = { kind: "single", sessionId: ns.sessionId };
@@ -18,7 +20,7 @@ export function buildSingleReceipt(ns: NormalizedSession): Receipt {
   const fp = computeFirstPromptFingerprint(ns.firstPrompt);
   const burn = computeBurnRatePeak(ns.tokenEvents);
 
-  return {
+  const out: Receipt = {
     scope,
     generatedAt: new Date().toISOString(),
 
@@ -98,12 +100,15 @@ export function buildSingleReceipt(ns: NormalizedSession): Receipt {
 
     firstPrompt: fp,
 
-    archetype: {
-      key: "vibe-coder",
-      taglineKey: "archetype.vibe-coder.tagline",
-      scores: {},
-    },
+    archetype: { key: "vibe-coder", taglineKey: "archetype.vibe-coder.tagline", scores: {} },
     comparison: null,
     achievements: [],
   };
+
+  // Archetype needs the receipt-as-built to score; assign post-hoc.
+  const arch = deriveArchetype(out, ns);
+  out.archetype = arch;
+  // Achievements depend on the archetype scores so must be derived after.
+  out.achievements = deriveAchievements(out);
+  return out;
 }
