@@ -124,6 +124,8 @@ interface TokenSum {
   inputTokens: number;
   outputTokens: number;
   cacheCreateTokens: number;
+  /** Subset of cacheCreateTokens that used the 1h cache (priced at 2× input vs 5m's 1.25×). */
+  cacheCreate1hTokens: number;
   cacheReadTokens: number;
 }
 
@@ -133,6 +135,7 @@ async function sumTokensInFile(filePath: string, sinceMs?: number): Promise<Toke
   let inputTokens = 0;
   let outputTokens = 0;
   let cacheCreateTokens = 0;
+  let cacheCreate1hTokens = 0;
   let cacheReadTokens = 0;
   for (const evt of events) {
     if (evt?.type !== "assistant") continue;
@@ -152,8 +155,13 @@ async function sumTokensInFile(filePath: string, sinceMs?: number): Promise<Toke
     outputTokens += Number(usage.output_tokens ?? 0);
     cacheCreateTokens += Number(usage.cache_creation_input_tokens ?? 0);
     cacheReadTokens += Number(usage.cache_read_input_tokens ?? 0);
+    // 5m vs 1h split lives under usage.cache_creation when the API serves it.
+    const cc = usage.cache_creation;
+    if (cc && typeof cc === "object") {
+      cacheCreate1hTokens += Number(cc.ephemeral_1h_input_tokens ?? 0);
+    }
   }
-  return { inputTokens, outputTokens, cacheCreateTokens, cacheReadTokens };
+  return { inputTokens, outputTokens, cacheCreateTokens, cacheCreate1hTokens, cacheReadTokens };
 }
 
 /**
@@ -172,12 +180,12 @@ async function fallbackTokenSum(
   sinceMs?: number,
 ): Promise<TokenSum> {
   const main = await sumTokensInFile(filePath, sinceMs);
-  // Subagent transcripts live under <parent-without-extension>/subagents/*.jsonl
   const parentBase = filePath.replace(/\.jsonl$/, "");
   const subagentDir = resolve(parentBase, "subagents");
   let subInput = 0;
   let subOutput = 0;
   let subCreate = 0;
+  let subCreate1h = 0;
   let subRead = 0;
   try {
     for await (const file of glob("*.jsonl", { cwd: subagentDir, withFileTypes: false })) {
@@ -186,6 +194,7 @@ async function fallbackTokenSum(
       subInput += sub.inputTokens;
       subOutput += sub.outputTokens;
       subCreate += sub.cacheCreateTokens;
+      subCreate1h += sub.cacheCreate1hTokens;
       subRead += sub.cacheReadTokens;
     }
   } catch {
@@ -195,6 +204,7 @@ async function fallbackTokenSum(
     inputTokens: main.inputTokens + subInput,
     outputTokens: main.outputTokens + subOutput,
     cacheCreateTokens: main.cacheCreateTokens + subCreate,
+    cacheCreate1hTokens: main.cacheCreate1hTokens + subCreate1h,
     cacheReadTokens: main.cacheReadTokens + subRead,
   };
 }
@@ -217,6 +227,7 @@ async function mergeTokensAndCost(
   let inputTokens = fb.inputTokens;
   let outputTokens = fb.outputTokens;
   let cacheCreateTokens = fb.cacheCreateTokens;
+  let cacheCreate1hTokens = fb.cacheCreate1hTokens;
   let cacheReadTokens = fb.cacheReadTokens;
   let ccusageCost = 0;
 
@@ -233,7 +244,8 @@ async function mergeTokensAndCost(
         const cc = Number(data.cacheCreationTokens ?? data.cache_creation_tokens ?? 0);
         const cr = Number(data.cacheReadTokens ?? data.cache_read_tokens ?? 0);
         const cu = Number(data.totalCost ?? data.totalCostUsd ?? data.cost ?? 0);
-        // Use ccusage tokens if non-zero
+        // Use ccusage tokens if non-zero (ccusage doesn't expose 5m vs 1h split,
+        // so we keep our own 1h count from the JSONL).
         if (ci + co + cc + cr > 0) {
           inputTokens = ci;
           outputTokens = co;
@@ -252,6 +264,7 @@ async function mergeTokensAndCost(
     inputTokens,
     outputTokens,
     cacheCreateTokens,
+    cacheCreate1hTokens,
     cacheReadTokens,
   });
   // Prefer ccusage's authoritative cost when it returned one; else our table.
