@@ -1,5 +1,6 @@
 import { readJsonlAll } from "../../util/jsonl.js";
 import type { Subagent, TopFile } from "../../data/receipt-schema.js";
+import { scorePoliteness } from "../politeness.js";
 
 /**
  * Personality fields extracted from a Claude Code JSONL file.
@@ -65,6 +66,7 @@ export interface ClaudePersonality {
 interface FilePatchAccum {
   added: number;
   removed: number;
+  editCount: number;
 }
 
 const TOOL_LIMIT = 5;
@@ -294,6 +296,12 @@ export async function extractClaudePersonality(
       if (realPrompt) {
         const len = realPrompt.real.length;
         out.promptLengths.push(len);
+        out.promptTexts.push(realPrompt.real);
+        if (typeof evt.timestamp === "string") {
+          out.promptTimestamps.push(evt.timestamp);
+        } else {
+          out.promptTimestamps.push("");
+        }
         if (!out.firstPrompt) out.firstPrompt = realPrompt.real;
         if (len > out.longestUserMsgChars) out.longestUserMsgChars = len;
         if (
@@ -320,8 +328,10 @@ export async function extractClaudePersonality(
 
         if (isFileEditResult) {
           const fp = tur.filePath;
-          if (!filePatchById.has(fp)) filePatchById.set(fp, { added: 0, removed: 0 });
+          if (!filePatchById.has(fp))
+            filePatchById.set(fp, { added: 0, removed: 0, editCount: 0 });
           const acc = filePatchById.get(fp)!;
+          acc.editCount += 1;
 
           let added = 0;
           let removed = 0;
@@ -415,7 +425,12 @@ export async function extractClaudePersonality(
 
   // Resolve files — keep ALL of them (combine + render slice top N from this list).
   const fileEntries = Array.from(filePatchById.entries())
-    .map(([path, p]) => ({ path, added: p.added, removed: p.removed }))
+    .map(([path, p]) => ({
+      path,
+      added: p.added,
+      removed: p.removed,
+      editCount: p.editCount,
+    }))
     .sort((a, b) => b.added + b.removed - (a.added + a.removed));
   out.filesTouched = fileEntries.map((f) => f.path);
   out.fileEntries = fileEntries;
@@ -466,6 +481,37 @@ export async function extractClaudePersonality(
 
   // Limit toolCounts via sorting at the read site (we keep all here for aggregation).
   void TOOL_LIMIT;
+
+  // v0.2 — politeness across all real user prompts
+  {
+    const pol = scorePoliteness(out.promptTexts);
+    out.politenessPlease = pol.please;
+    out.politenessThanks = pol.thanks;
+    out.politenessSorry = pol.sorry;
+  }
+
+  // v0.2 — longest solo-stretch: max gap between two consecutive REAL user prompts.
+  // (one prompt → 0; no prompts → 0.)
+  if (out.promptTimestamps.length >= 2) {
+    const tss = out.promptTimestamps
+      .map((s) => Date.parse(s))
+      .filter((n) => Number.isFinite(n));
+    tss.sort((a, b) => a - b);
+    let maxGap = 0;
+    let maxStart: number | null = null;
+    let maxEnd: number | null = null;
+    for (let i = 1; i < tss.length; i++) {
+      const gap = tss[i]! - tss[i - 1]!;
+      if (gap > maxGap) {
+        maxGap = gap;
+        maxStart = tss[i - 1]!;
+        maxEnd = tss[i]!;
+      }
+    }
+    out.longestSoloStretchMs = maxGap;
+    if (maxStart !== null) out.longestSoloStretchStartUtc = new Date(maxStart).toISOString();
+    if (maxEnd !== null) out.longestSoloStretchEndUtc = new Date(maxEnd).toISOString();
+  }
 
   return out;
 }

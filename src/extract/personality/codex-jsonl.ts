@@ -1,5 +1,6 @@
 import { readJsonlAll } from "../../util/jsonl.js";
 import type { Subagent, TopFile } from "../../data/receipt-schema.js";
+import { scorePoliteness } from "../politeness.js";
 
 /**
  * Codex CLI JSONL → personality bundle.
@@ -144,7 +145,7 @@ export async function extractCodexPersonality(
 
   if (events.length === 0) return out;
 
-  const fileMap = new Map<string, { added: number; removed: number }>();
+  const fileMap = new Map<string, { added: number; removed: number; editCount: number }>();
   const modelSet = new Set<string>();
 
   let firstTs: number | null = null;
@@ -186,6 +187,15 @@ export async function extractCodexPersonality(
         const text = payload.text.trim();
         if (text.length > 0) {
           out.promptLengths.push(text.length);
+          out.promptTexts.push(text);
+          // Codex events nest timestamp under payload or at top-level
+          const tsStr =
+            typeof payload.timestamp === "string"
+              ? payload.timestamp
+              : typeof evt.timestamp === "string"
+                ? evt.timestamp
+                : "";
+          out.promptTimestamps.push(tsStr);
           if (!out.firstPrompt) out.firstPrompt = text;
           if (text.length > out.longestUserMsgChars) out.longestUserMsgChars = text.length;
           if (
@@ -211,7 +221,8 @@ export async function extractCodexPersonality(
           }
           const result = parseApplyPatch(parsed);
           for (const f of result.files) {
-            if (!fileMap.has(f)) fileMap.set(f, { added: 0, removed: 0 });
+            if (!fileMap.has(f)) fileMap.set(f, { added: 0, removed: 0, editCount: 0 });
+            fileMap.get(f)!.editCount += 1;
           }
           // Distribute additions/removals across all touched files (best-effort).
           // For simplicity, attribute totals to the first file when 1, or all proportionally.
@@ -259,7 +270,12 @@ export async function extractCodexPersonality(
   }
 
   const fileEntries = Array.from(fileMap.entries())
-    .map(([path, p]) => ({ path, added: p.added, removed: p.removed }))
+    .map(([path, p]) => ({
+      path,
+      added: p.added,
+      removed: p.removed,
+      editCount: p.editCount,
+    }))
     .sort((a, b) => b.added + b.removed - (a.added + a.removed));
   out.filesTouched = fileEntries.map((f) => f.path);
   out.fileEntries = fileEntries;
@@ -268,6 +284,36 @@ export async function extractCodexPersonality(
     out.linesRemoved += f.removed;
   }
   void TOP_FILES_LIMIT;
+
+  // v0.2 — politeness
+  {
+    const pol = scorePoliteness(out.promptTexts);
+    out.politenessPlease = pol.please;
+    out.politenessThanks = pol.thanks;
+    out.politenessSorry = pol.sorry;
+  }
+
+  // v0.2 — longest solo-stretch
+  if (out.promptTimestamps.length >= 2) {
+    const tss = out.promptTimestamps
+      .map((s) => Date.parse(s))
+      .filter((n) => Number.isFinite(n));
+    tss.sort((a, b) => a - b);
+    let maxGap = 0;
+    let maxStart: number | null = null;
+    let maxEnd: number | null = null;
+    for (let i = 1; i < tss.length; i++) {
+      const gap = tss[i]! - tss[i - 1]!;
+      if (gap > maxGap) {
+        maxGap = gap;
+        maxStart = tss[i - 1]!;
+        maxEnd = tss[i]!;
+      }
+    }
+    out.longestSoloStretchMs = maxGap;
+    if (maxStart !== null) out.longestSoloStretchStartUtc = new Date(maxStart).toISOString();
+    if (maxEnd !== null) out.longestSoloStretchEndUtc = new Date(maxEnd).toISOString();
+  }
 
   return out;
 }

@@ -4,6 +4,7 @@ import type { NormalizedSession, Source } from "../data/types.js";
 import { topToolStats } from "../data/types.js";
 import { computeFirstPromptFingerprint } from "../redact/fingerprint.js";
 import { promptStatsOf } from "./prompt-stats.js";
+import { computeCostPerLine, computeMostEditedFile } from "./derive-stats.js";
 
 const TOP_FILES_LIMIT = 5;
 const TOOL_LIMIT = 5;
@@ -102,8 +103,14 @@ export function buildCombinedReceipt(
       if (cur) {
         cur.added += f.added;
         cur.removed += f.removed;
+        cur.editCount = (cur.editCount ?? 0) + (f.editCount ?? 1);
       } else {
-        fileMap.set(f.path, { path: f.path, added: f.added, removed: f.removed });
+        fileMap.set(f.path, {
+          path: f.path,
+          added: f.added,
+          removed: f.removed,
+          editCount: f.editCount ?? 1,
+        });
       }
     }
     bashCommands += s.bashCommands;
@@ -219,7 +226,11 @@ export function buildCombinedReceipt(
       rateLimitWaitMs,
       burnRatePeakTokensPerMin: 0,
       burnRatePeakWindowUtc: null,
-      costPerLineUsd: 0,
+      costPerLineUsd: computeCostPerLine(
+        totalUsd,
+        fileEntries.reduce((s, f) => s + f.added, 0),
+        fileEntries.reduce((s, f) => s + f.removed, 0),
+      ),
     },
     work: {
       filesTouched: fileMap.size,
@@ -229,7 +240,7 @@ export function buildCombinedReceipt(
       bashCommands,
       webFetches,
       userModified,
-      mostEditedFile: null,
+      mostEditedFile: computeMostEditedFile(fileEntries),
     },
     tools: {
       total: Object.values(toolCounts).reduce((s, n) => s + n, 0),

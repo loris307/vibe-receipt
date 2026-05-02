@@ -152,7 +152,7 @@ Sehr gering — nur Schema-Erweiterung mit defaults. Existing render code muss n
 
 Diese 4 Stats brauchen keine neue Infrastruktur. Können in beliebiger Reihenfolge oder parallel.
 
-### 2a — Longest solo-stretch
+### 2a — Longest solo-stretch ✅ DONE
 
 **Definition:** Längste Lücke zwischen zwei aufeinanderfolgenden **realen** User-Prompts (nicht tool_results, nicht hooks).
 
@@ -193,7 +193,7 @@ function computeLongestSolo(promptTimestamps: string[]): {
 
 ---
 
-### 2b — Politeness score
+### 2b — Politeness score ✅ DONE
 
 **Definition:** Count von "please/thanks/sorry" (+ DE: "bitte/danke/entschuldigung") über alle realen User-Prompts. Case-insensitive, word-boundary.
 
@@ -237,7 +237,7 @@ function score(prompts: string[]) {
 
 ---
 
-### 2c — Cost per line shipped (derived)
+### 2c — Cost per line shipped (derived) ✅ DONE
 
 **Definition:** `totalUsd / max(1, linesAdded - linesRemoved)`. Wenn delta ≤ 0 → null/0.
 
@@ -258,7 +258,7 @@ const costPerLineUsd = netLines > 0 ? ns.totalCostUsd / netLines : 0;
 
 ---
 
-### 2d — Most-edited single file
+### 2d — Most-edited single file ✅ DONE
 
 **Definition:** das File mit dem höchsten **Edit-Count** (nicht lines added — count der Tool-Aufrufe). Edit/Write/MultiEdit zählen als 1 edit pro Aufruf.
 
