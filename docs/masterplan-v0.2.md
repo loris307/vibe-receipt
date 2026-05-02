@@ -774,7 +774,7 @@ function pickAchievements(r: Receipt): Achievement[] {
 
 ---
 
-## Phase 8 — Render + i18n + Smart-redact
+## Phase 8 — Render + i18n + Smart-redact ✅ DONE
 
 > **Depends on all prior phases.** Macht alles sichtbar im PNG/ANSI.
 

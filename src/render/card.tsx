@@ -8,6 +8,51 @@ import { compactNumber, formatPercent, formatUsd } from "../util/compact-number.
 import { formatDurationMs } from "../util/duration.js";
 import { truncateShortestText } from "../redact/smart-redact.js";
 
+/** Substitute tagline placeholders ({n}, {r}, {e}, {d}, {hh}, {mm}) with concrete values. */
+function renderArchetypeTagline(template: string, r: Receipt): string {
+  if (!template) return "";
+  const startDate = new Date(r.time.startUtc);
+  const hh = String(startDate.getHours()).padStart(2, "0");
+  const mm = String(startDate.getMinutes()).padStart(2, "0");
+  const ak = r.archetype.key;
+  // For each archetype, decide which {n} stands for what
+  let n = "0";
+  if (ak === "specifier") {
+    const pct =
+      r.personality.promptCount > 0
+        ? Math.round(((r.archetype.scores.specifier ?? 0) * 0.4 + 0.2) * 100)
+        : 0;
+    n = String(pct);
+  } else if (ak === "vibe-coder") n = String(r.personality.avgPromptChars);
+  else if (ak === "fixer") {
+    // approximate from score: score = (rate-0.2)/0.4, so rate = score*0.4 + 0.2
+    const rate = (r.archetype.scores.fixer ?? 0) * 0.4 + 0.2;
+    n = String(Math.round(rate * 100));
+  } else if (ak === "firefighter")
+    n = String(r.cost.rateLimitHits + r.personality.escInterrupts);
+  else if (ak === "esc-rager") n = String(r.personality.escInterrupts);
+  // For researcher: {r} reads, {e} edits
+  return template
+    .replace("{n}", n)
+    .replace("{hh}", hh)
+    .replace("{mm}", mm)
+    .replace(
+      "{r}",
+      String(
+        (r.tools.top.find((t) => t.name === "Read")?.count ?? 0) +
+          (r.tools.top.find((t) => t.name === "Grep")?.count ?? 0),
+      ),
+    )
+    .replace(
+      "{e}",
+      String(
+        (r.tools.top.find((t) => t.name === "Edit")?.count ?? 0) +
+          (r.tools.top.find((t) => t.name === "Write")?.count ?? 0),
+      ),
+    )
+    .replace("{d}", formatDurationMs(r.time.longestSoloStretchMs));
+}
+
 interface CardProps {
   receipt: Receipt;
   s: Strings;
@@ -104,6 +149,70 @@ function Row({
       >
         {value}
       </span>
+    </div>
+  );
+}
+
+function ComparisonLine({
+  label,
+  tokenPct,
+  costPct,
+  text,
+}: {
+  label: string;
+  tokenPct?: number;
+  costPct?: number;
+  text?: string;
+}) {
+  // Build the body. If pcts provided, format them with sign.
+  const body =
+    text ??
+    [
+      typeof tokenPct === "number"
+        ? `${tokenPct >= 0 ? "+" : ""}${(tokenPct * 100).toFixed(0)}% tok`
+        : null,
+      typeof costPct === "number"
+        ? `${costPct >= 0 ? "+" : ""}${(costPct * 100).toFixed(0)}% $`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "row",
+        alignItems: "center",
+        marginTop: 6,
+        marginBottom: 2,
+        width: "100%",
+      }}
+    >
+      <div style={{ display: "flex", width: 240 }}>
+        <span
+          style={{
+            fontFamily: theme.monoFamily,
+            fontWeight: 400,
+            fontSize: 18,
+            color: theme.inkSoft,
+          }}
+        >
+          {label}
+        </span>
+      </div>
+      <div style={{ display: "flex", flex: 1 }}>
+        <span
+          style={{
+            fontFamily: theme.monoFamily,
+            fontWeight: 400,
+            fontSize: 18,
+            color: theme.inkMuted,
+            fontStyle: "italic",
+          }}
+        >
+          {body}
+        </span>
+      </div>
     </div>
   );
 }
@@ -393,6 +502,39 @@ export function VibeCard({ receipt, s, size, height }: CardProps): React.ReactEl
         <Row label={s.labelTokens} value={compactNumber(totalTokens)} />
         <Row label={s.labelCost} value={formatUsd(receipt.cost.totalUsd)} emphasis />
         <Row label={s.labelCacheHit} value={formatPercent(receipt.cost.cacheHitRatio)} />
+        {receipt.time.longestSoloStretchMs > 60_000 ? (
+          <Row
+            label={s.labelLongestSolo}
+            value={formatDurationMs(receipt.time.longestSoloStretchMs)}
+          />
+        ) : null}
+        {receipt.cost.burnRatePeakTokensPerMin > 0 ? (
+          <Row
+            label={s.labelPeakBurn}
+            value={`${compactNumber(receipt.cost.burnRatePeakTokensPerMin)}/min`}
+          />
+        ) : null}
+        {receipt.cost.rateLimitHits > 0 ? (
+          <Row
+            label={s.labelRateLimits}
+            value={`× ${receipt.cost.rateLimitHits} · ${formatDurationMs(receipt.cost.rateLimitWaitMs)}`}
+          />
+        ) : null}
+        {receipt.comparison?.vsLastSession ? (
+          <ComparisonLine
+            label={s.labelVsLast}
+            tokenPct={receipt.comparison.vsLastSession.deltaTokensPct}
+            costPct={receipt.comparison.vsLastSession.deltaCostPct}
+          />
+        ) : null}
+        {receipt.comparison?.vsLast7Days ? (
+          <ComparisonLine
+            label={s.labelRankWeek}
+            text={`${receipt.comparison.vsLast7Days.tokensRankInWindow}/${receipt.comparison.vsLast7Days.sessionsInWindow}${
+              receipt.comparison.vsLast7Days.longestSessionInWindow ? "  " + s.labelLongestThisWeek : ""
+            }`}
+          />
+        ) : null}
       </div>
 
       <Divider />
@@ -406,6 +548,18 @@ export function VibeCard({ receipt, s, size, height }: CardProps): React.ReactEl
         <Row label={s.labelBash} value={String(receipt.work.bashCommands)} />
         {receipt.work.webFetches > 0 ? (
           <Row label={s.labelWeb} value={String(receipt.work.webFetches)} />
+        ) : null}
+        {receipt.work.mostEditedFile ? (
+          <Row
+            label={s.labelMostEdited}
+            value={`${receipt.work.mostEditedFile.path} · ${receipt.work.mostEditedFile.editCount}× · +${receipt.work.mostEditedFile.added}/−${receipt.work.mostEditedFile.removed}`}
+          />
+        ) : null}
+        {receipt.cost.costPerLineUsd > 0 ? (
+          <Row
+            label={s.labelCostPerLine}
+            value={`$${receipt.cost.costPerLineUsd.toFixed(4)}`}
+          />
         ) : null}
       </div>
 
@@ -479,6 +633,19 @@ export function VibeCard({ receipt, s, size, height }: CardProps): React.ReactEl
         ) : null}
         {receipt.personality.slashCommands.length > 0 ? (
           <Row label={s.labelSlash} value={receipt.personality.slashCommands.join(", ")} />
+        ) : null}
+        {receipt.personality.waitThenGoCount > 0 ? (
+          <Row label={s.labelWaitThenGo} value={`× ${receipt.personality.waitThenGoCount}`} />
+        ) : null}
+        {receipt.personality.politenessScore.total > 0 ? (
+          <Row
+            label={s.labelManners}
+            value={`${receipt.personality.politenessScore.please}× please · ${receipt.personality.politenessScore.thanks}× thanks${
+              receipt.personality.politenessScore.sorry > 0
+                ? ` · ${receipt.personality.politenessScore.sorry}× sorry`
+                : ""
+            }`}
+          />
         ) : null}
       </div>
 
@@ -584,8 +751,132 @@ export function VibeCard({ receipt, s, size, height }: CardProps): React.ReactEl
         </div>
       ) : null}
 
+      {/* BADGES — 0..3 emoji-glyph achievements */}
+      {receipt.achievements.length > 0 && size !== "og" ? (
+        <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
+          <Divider />
+          <SectionHeader>{s.sectionBadges}</SectionHeader>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              flexWrap: "wrap",
+              gap: 18,
+              marginTop: 6,
+            }}
+          >
+            {receipt.achievements.map((a) => {
+              const labelKey =
+                ("achievement" +
+                  a.key
+                    .split("-")
+                    .map((p) => p[0]!.toUpperCase() + p.slice(1))
+                    .join("")) as keyof typeof s;
+              const label = (s[labelKey] as string) ?? a.key;
+              return (
+                <div
+                  key={a.key}
+                  style={{
+                    display: "flex",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 8,
+                    paddingTop: 6,
+                    paddingBottom: 6,
+                    paddingLeft: 12,
+                    paddingRight: 12,
+                    background: "#F5F0E6",
+                    borderRadius: 6,
+                  }}
+                >
+                  <span style={{ fontSize: 22 }}>{a.iconGlyph}</span>
+                  <span
+                    style={{
+                      fontFamily: theme.monoFamily,
+                      fontWeight: 700,
+                      fontSize: 16,
+                      color: theme.ink,
+                    }}
+                  >
+                    {label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
       {/* spacer */}
       <div style={{ display: "flex", flex: 1 }} />
+
+      {/* ARCHETYPE stamp — faux rubber-stamp at the foot of the receipt */}
+      {size !== "og" ? (
+        (() => {
+          const ak = receipt.archetype.key;
+          const nameKey = ("arch" +
+            ak
+              .split("-")
+              .map((p) => p[0]!.toUpperCase() + p.slice(1))
+              .join("") +
+            "Name") as keyof typeof s;
+          const taglineKey = (nameKey.toString().replace("Name", "Tagline")) as keyof typeof s;
+          const name = (s[nameKey] as string) ?? ak.toUpperCase();
+          const taglineRaw = (s[taglineKey] as string) ?? "";
+          const tagline = renderArchetypeTagline(taglineRaw, receipt);
+          return (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                width: "100%",
+                marginBottom: 14,
+                marginTop: 6,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  paddingTop: 6,
+                  paddingBottom: 6,
+                  paddingLeft: 22,
+                  paddingRight: 22,
+                  border: `3px solid ${theme.ink}`,
+                  borderRadius: 4,
+                  transform: "rotate(-3deg)",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: theme.monoFamily,
+                    fontWeight: 700,
+                    fontSize: 26,
+                    color: theme.ink,
+                    letterSpacing: 2,
+                  }}
+                >
+                  [ {name} ]
+                </span>
+              </div>
+              {tagline ? (
+                <span
+                  style={{
+                    fontFamily: theme.monoFamily,
+                    fontWeight: 400,
+                    fontSize: 16,
+                    color: theme.inkMuted,
+                    marginTop: 8,
+                    fontStyle: "italic",
+                  }}
+                >
+                  {tagline}
+                </span>
+              ) : null}
+            </div>
+          );
+        })()
+      ) : null}
 
       {isMulti ? (
         <div style={{ display: "flex", justifyContent: "center", width: "100%", marginBottom: 6 }}>

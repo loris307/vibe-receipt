@@ -78,6 +78,40 @@ export function renderAnsi(receipt: Receipt, s: Strings): string {
   lines.push(row(s.labelTokens, compactNumber(totalTokens)));
   lines.push(row(s.labelCost, formatUsd(receipt.cost.totalUsd)));
   lines.push(row(s.labelCacheHit, formatPercent(receipt.cost.cacheHitRatio)));
+  if (receipt.time.longestSoloStretchMs > 60_000)
+    lines.push(row(s.labelLongestSolo, formatDurationMs(receipt.time.longestSoloStretchMs)));
+  if (receipt.cost.burnRatePeakTokensPerMin > 0)
+    lines.push(
+      row(s.labelPeakBurn, `${compactNumber(receipt.cost.burnRatePeakTokensPerMin)}/min`),
+    );
+  if (receipt.cost.rateLimitHits > 0)
+    lines.push(
+      row(
+        s.labelRateLimits,
+        `× ${receipt.cost.rateLimitHits} · ${formatDurationMs(receipt.cost.rateLimitWaitMs)}`,
+      ),
+    );
+  if (receipt.comparison?.vsLastSession) {
+    const c = receipt.comparison.vsLastSession;
+    const tokenSign = c.deltaTokensPct >= 0 ? "+" : "";
+    const costSign = c.deltaCostPct >= 0 ? "+" : "";
+    lines.push(
+      chalk.italic(
+        chalk.dim(
+          `  ${s.labelVsLast}: ${tokenSign}${(c.deltaTokensPct * 100).toFixed(0)}% tok · ${costSign}${(c.deltaCostPct * 100).toFixed(0)}% $`,
+        ),
+      ),
+    );
+  }
+  if (receipt.comparison?.vsLast7Days) {
+    const w = receipt.comparison.vsLast7Days;
+    const lq = w.longestSessionInWindow ? "  " + s.labelLongestThisWeek : "";
+    lines.push(
+      chalk.italic(
+        chalk.dim(`  ${s.labelRankWeek}: ${w.tokensRankInWindow}/${w.sessionsInWindow}${lq}`),
+      ),
+    );
+  }
   lines.push(divider());
 
   // WORK
@@ -89,6 +123,12 @@ export function renderAnsi(receipt: Receipt, s: Strings): string {
   if (receipt.work.webFetches > 0) {
     lines.push(row(s.labelWeb, String(receipt.work.webFetches)));
   }
+  if (receipt.work.mostEditedFile) {
+    const f = receipt.work.mostEditedFile;
+    lines.push(row(s.labelMostEdited, `${f.path} · ${f.editCount}× · +${f.added}/−${f.removed}`));
+  }
+  if (receipt.cost.costPerLineUsd > 0)
+    lines.push(row(s.labelCostPerLine, `$${receipt.cost.costPerLineUsd.toFixed(4)}`));
   if (receipt.work.topFiles.length > 0) {
     lines.push("");
     for (const f of receipt.work.topFiles.slice(0, 3)) {
@@ -138,6 +178,17 @@ export function renderAnsi(receipt: Receipt, s: Strings): string {
     lines.push(row(s.labelSkills, receipt.personality.skills.join(", ")));
   if (receipt.personality.slashCommands.length > 0)
     lines.push(row(s.labelSlash, receipt.personality.slashCommands.join(", ")));
+  if (receipt.personality.waitThenGoCount > 0)
+    lines.push(row(s.labelWaitThenGo, `× ${receipt.personality.waitThenGoCount}`));
+  if (receipt.personality.politenessScore.total > 0) {
+    const ps = receipt.personality.politenessScore;
+    lines.push(
+      row(
+        s.labelManners,
+        `${ps.please}× please · ${ps.thanks}× thanks${ps.sorry > 0 ? ` · ${ps.sorry}× sorry` : ""}`,
+      ),
+    );
+  }
   lines.push(divider());
 
   // PROMPTING
@@ -161,6 +212,37 @@ export function renderAnsi(receipt: Receipt, s: Strings): string {
   lines.push(
     `  ${chalk.dim(`${receipt.firstPrompt.moodEmoji} · ${s.fpFooterShaPrefix}${receipt.firstPrompt.fingerprintSha}`)}`,
   );
+
+  // BADGES
+  if (receipt.achievements.length > 0) {
+    lines.push("");
+    lines.push(sectionHeader(s.sectionBadges));
+    const labels = receipt.achievements.map((a) => {
+      const labelKey = ("achievement" +
+        a.key
+          .split("-")
+          .map((p) => p[0]!.toUpperCase() + p.slice(1))
+          .join("")) as keyof Strings;
+      const label = (s[labelKey] as string) ?? a.key;
+      return `${a.iconGlyph} ${chalk.bold(label)}`;
+    });
+    lines.push(`  ${labels.join("   ")}`);
+  }
+
+  // ARCHETYPE stamp
+  {
+    const ak = receipt.archetype.key;
+    const nameKey = ("arch" +
+      ak
+        .split("-")
+        .map((p) => p[0]!.toUpperCase() + p.slice(1))
+        .join("") +
+      "Name") as keyof Strings;
+    const name = (s[nameKey] as string) ?? ak.toUpperCase();
+    lines.push("");
+    lines.push(`        ${chalk.bold(gradientText(`[ ${name} ]`))}`);
+  }
+
   lines.push("");
   lines.push(chalk.dim(`        ${s.footerGen}`));
   lines.push(chalk.dim(`        ${s.footerRepo}`));

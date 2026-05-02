@@ -38,6 +38,14 @@ export function applyRedaction(receipt: Receipt, reveal: RevealOpts = NO_REVEAL)
     work: {
       ...receipt.work,
       topFiles: receipt.work.topFiles.map((f) => redactFile(f, reveal.paths)),
+      mostEditedFile: receipt.work.mostEditedFile
+        ? {
+            ...receipt.work.mostEditedFile,
+            path: reveal.paths
+              ? receipt.work.mostEditedFile.path
+              : basename(receipt.work.mostEditedFile.path),
+          }
+        : null,
     },
     firstPrompt: {
       ...receipt.firstPrompt,

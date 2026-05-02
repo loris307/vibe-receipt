@@ -31,12 +31,20 @@ export function estimateReceiptHeight(r: Receipt, base: SizePreset): number {
   const isMulti = r.meta.sessionCount > 1;
   h += isMulti ? 36 * 3 : 36; // sessions/wall/active OR duration
   h += 36 * 4; // model/tokens/cost/cache
+  // v0.2 — conditional rows
+  if (r.time.longestSoloStretchMs > 60_000) h += 36;
+  if (r.cost.burnRatePeakTokensPerMin > 0) h += 36;
+  if (r.cost.rateLimitHits > 0) h += 36;
+  if (r.comparison?.vsLastSession) h += 30;
+  if (r.comparison?.vsLast7Days) h += 30;
   h += 50; // divider
 
   // WORK
   h += 60;
   h += 36 * 4;
   if (r.work.webFetches > 0) h += 36;
+  if (r.work.mostEditedFile) h += 36;
+  if (r.cost.costPerLineUsd > 0) h += 36;
   h += 50;
 
   // TOP TOOLS
@@ -60,6 +68,8 @@ export function estimateReceiptHeight(r: Receipt, base: SizePreset): number {
   if (r.personality.thinkingMs > 1000) pRows++;
   if (r.personality.skills.length > 0) pRows++;
   if (r.personality.slashCommands.length > 0) pRows++;
+  if (r.personality.waitThenGoCount > 0) pRows++;
+  if (r.personality.politenessScore.total > 0) pRows++;
   h += 60 + 36 * pRows;
   h += 50;
 
@@ -74,6 +84,11 @@ export function estimateReceiptHeight(r: Receipt, base: SizePreset): number {
     h += 36; // mood/sha
     h += 50;
   }
+
+  // BADGES
+  if (r.achievements.length > 0) h += 60 + 50; // section + content
+  // ARCHETYPE stamp
+  h += 100;
 
   // FOOTER
   h += 100;

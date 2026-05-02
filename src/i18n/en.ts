@@ -57,5 +57,52 @@ export const en = {
   footerGen: "generated with vibe-receipt",
   footerRepo: "github.com/loris307/vibe-receipt",
   combineHint: "active time across parallel sessions",
+
+  // v0.2 — new stat labels
+  labelLongestSolo: "longest solo",
+  labelMostEdited: "most edited",
+  labelRateLimits: "rate limits",
+  labelPeakBurn: "peak burn",
+  labelCostPerLine: "$/line",
+  labelWaitThenGo: "wait-then-go",
+  labelManners: "manners",
+  labelVsLast: "vs last",
+  labelRankWeek: "week rank",
+  labelLongestThisWeek: "🏆 longest of last 7 days",
+
+  sectionBadges: "BADGES",
+  sectionArchetype: "ARCHETYPE",
+
+  // Achievement labels
+  achievementTokenMillionaire: "Token Millionaire",
+  achievementBigSpender: "Big Spender",
+  achievementMarathoner: "Marathoner",
+  achievementAutoPilot: "Auto-Pilot",
+  achievementDeepThinker: "Deep Thinker",
+  achievementNoErrorStreak: "No-Error Streak",
+  achievementSprinter: "Sprinter",
+  achievementToolboxMaster: "Toolbox Master",
+  achievementNightOwl: "Night Owl",
+  achievementResearcher: "Researcher",
+  achievementBugHunter: "Bug Hunter",
+  achievementPolite: "Polite",
+
+  // Archetype names + taglines (placeholders {n}, {r}, {e}, {d}, {hh}:{mm})
+  archSpecifierName: "THE SPECIFIER",
+  archSpecifierTagline: "{n}% of your prompts had explicit paths",
+  archVibeCoderName: "THE VIBE-CODER",
+  archVibeCoderTagline: "{n} chars per prompt — you trusted the model",
+  archFixerName: "THE FIXER",
+  archFixerTagline: "{n}% of your prompts mentioned a bug",
+  archResearcherName: "THE RESEARCHER",
+  archResearcherTagline: "{r} reads · {e} edits — recon mode",
+  archFirefighterName: "THE FIREFIGHTER",
+  archFirefighterTagline: "you survived {n} errors",
+  archTrustfallName: "THE TRUSTFALL PILOT",
+  archTrustfallTagline: "claude ran {d} solo — you trusted",
+  archEscRagerName: "THE ESC-RAGER",
+  archEscRagerTagline: "{n}× ESC — you have standards",
+  archNightOwlName: "THE NIGHT OWL",
+  archNightOwlTagline: "session at {hh}:{mm} — others were asleep",
 };
 export type Strings = typeof en;
