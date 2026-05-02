@@ -296,7 +296,7 @@ TopFileSchema = v.object({
 
 ## Phase 3 — New JSONL signals
 
-### 3a — Rate-limit hits
+### 3a — Rate-limit hits ✅ DONE
 
 **Definition:** Count von `system.subtype === "api_error"` events mit `error.error.type === "rate_limit_error"`. Sum über `error.retryInMs`.
 
@@ -327,7 +327,7 @@ for (const e of events) {
 
 ---
 
-### 3b — Burn-rate peak
+### 3b — Burn-rate peak ✅ DONE
 
 **Definition:** Max(tokens-per-minute) über die Session. Bin assistant message tokens (input+output) in 60-Sekunden-Windows nach `timestamp`. Output: peak window's value + window-start UTC.
 
@@ -370,7 +370,7 @@ function computeBurnRatePeak(events: {ts:number, tokens:number}[]): {tpm:number,
 
 ---
 
-### 3c — Wait-then-go count
+### 3c — Wait-then-go count ✅ DONE
 
 **Definition:** Anzahl der User-Prompts, die geschickt wurden während Claude noch arbeitete (also vor dem nächsten `stop_reason === "end_turn"` der Antwort).
 

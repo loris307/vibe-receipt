@@ -1,5 +1,10 @@
 import type { MostEditedFile, TopFile } from "../data/receipt-schema.js";
 
+export interface TokenEvent {
+  ts: number;
+  tokens: number;
+}
+
 /**
  * Cost per net line of code shipped, USD.
  * Uses (added - removed); zero or negative net → 0 (display layer hides 0).
@@ -12,6 +17,36 @@ export function computeCostPerLine(
   const net = added - removed;
   if (net <= 0) return 0;
   return totalUsd / net;
+}
+
+/**
+ * Peak burn rate: max sum of tokens in any 60-second sliding window across all
+ * assistant-message events. Returns the peak count and the start-of-window UTC.
+ *
+ * Empty input → { tpm: 0, windowStartUtc: null }.
+ */
+export function computeBurnRatePeak(
+  events: TokenEvent[],
+): { tpm: number; windowStartUtc: string | null } {
+  if (events.length === 0) return { tpm: 0, windowStartUtc: null };
+  const sorted = [...events].sort((a, b) => a.ts - b.ts);
+  const windowMs = 60_000;
+  let peak = 0;
+  let peakStart = sorted[0]!.ts;
+  let left = 0;
+  let sum = 0;
+  for (let r = 0; r < sorted.length; r++) {
+    sum += sorted[r]!.tokens;
+    while (left < r && sorted[r]!.ts - sorted[left]!.ts > windowMs) {
+      sum -= sorted[left]!.tokens;
+      left += 1;
+    }
+    if (sum > peak) {
+      peak = sum;
+      peakStart = sorted[left]!.ts;
+    }
+  }
+  return { tpm: peak, windowStartUtc: new Date(peakStart).toISOString() };
 }
 
 /**

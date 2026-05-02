@@ -226,6 +226,10 @@ export async function extractClaudePersonality(
 
   const filePatchById: Map<string, FilePatchAccum> = new Map();
   const seenToolUseIds = new Set<string>();
+  const seenMessageIds = new Set<string>();
+  // v0.2 — wait-then-go: track whether the assistant is mid-stream when the
+  // next real user prompt lands.
+  let assistantInFlight = false;
   const skillSet = new Set<string>();
   const slashSet = new Set<string>();
   const modelSet = new Set<string>();
@@ -269,6 +273,19 @@ export async function extractClaudePersonality(
       } else if (sub === "stop_hook_summary") {
         const errs = evt.hookErrors;
         if (Array.isArray(errs)) out.hookErrors += errs.length;
+      } else if (sub === "compact_boundary") {
+        assistantInFlight = false;
+      } else if (sub === "api_error") {
+        // Rate-limit detection. Robust path: HTTP status 429 (Anthropic rate limit).
+        // Fallback path: deeply-nested error.error.error.type === "rate_limit_error".
+        const status = evt?.error?.status;
+        const innerType = evt?.error?.error?.error?.type;
+        if (status === 429 || innerType === "rate_limit_error") {
+          out.rateLimitHits += 1;
+          if (typeof evt.retryInMs === "number" && Number.isFinite(evt.retryInMs)) {
+            out.rateLimitWaitMs += Math.max(0, evt.retryInMs);
+          }
+        }
       }
       continue;
     }
@@ -294,6 +311,10 @@ export async function extractClaudePersonality(
       }
       const realPrompt = isRealUserPrompt(evt);
       if (realPrompt) {
+        if (assistantInFlight) {
+          out.waitThenGoCount += 1;
+        }
+        assistantInFlight = false;
         const len = realPrompt.real.length;
         out.promptLengths.push(len);
         out.promptTexts.push(realPrompt.real);
@@ -365,6 +386,8 @@ export async function extractClaudePersonality(
           if (tur.userModified === true) out.userModified += 1;
         } else if (tur.interrupted === true) {
           out.escInterrupts += 1;
+          // ESC interrupt clears any in-flight state — the next prompt is not "wait-then-go"
+          assistantInFlight = false;
         } else if (tur.agentType && typeof tur.totalDurationMs === "number") {
           out.subagents.push({
             type: String(tur.agentType),
@@ -393,6 +416,16 @@ export async function extractClaudePersonality(
       if (!msg || typeof msg !== "object") continue;
       if (typeof msg.model === "string") modelSet.add(msg.model);
 
+      // v0.2 — wait-then-go: track whether assistant intends to continue.
+      // stop_reason "end_turn" → finished, "tool_use" / "max_tokens" / "stop_sequence" → mid-stream.
+      // stop_reason may be undefined for streaming intermediates (treat as in-flight).
+      const sr = msg.stop_reason;
+      if (sr === "end_turn") {
+        assistantInFlight = false;
+      } else if (typeof sr === "string" && sr.length > 0) {
+        assistantInFlight = true;
+      }
+
       const content = Array.isArray(msg.content) ? msg.content : [];
       let hasThinking = false;
       for (const block of content) {
@@ -418,6 +451,25 @@ export async function extractClaudePersonality(
       if (hasThinking && evt.timestamp) {
         const t = new Date(evt.timestamp).getTime();
         if (Number.isFinite(t)) thinkingTurnTimestamps.push(t);
+      }
+
+      // v0.2 — burn-rate event: input + output + cache_create per assistant message.
+      // Skip cache-read (that's prior-cache consumption, not new tokens generated).
+      // Dedup by (message.id, requestId) to match cost-summation behaviour.
+      if (evt.timestamp) {
+        const dedupKey = `${msg.id ?? ""}::${evt.requestId ?? ""}`;
+        if (!seenMessageIds.has(dedupKey)) {
+          seenMessageIds.add(dedupKey);
+          const usage = msg.usage ?? {};
+          const inp = Number(usage.input_tokens ?? 0);
+          const outp = Number(usage.output_tokens ?? 0);
+          const cc = Number(usage.cache_creation_input_tokens ?? 0);
+          const total = inp + outp + cc;
+          if (total > 0) {
+            const t = new Date(evt.timestamp).getTime();
+            if (Number.isFinite(t)) out.tokenEvents.push({ ts: t, tokens: total });
+          }
+        }
       }
       continue;
     }

@@ -4,7 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { extractClaudePersonality } from "../../src/extract/personality/claude-jsonl.js";
 import { scorePoliteness } from "../../src/extract/politeness.js";
-import { computeCostPerLine, computeMostEditedFile } from "../../src/aggregate/derive-stats.js";
+import {
+  computeBurnRatePeak,
+  computeCostPerLine,
+  computeMostEditedFile,
+} from "../../src/aggregate/derive-stats.js";
 
 async function makeFixture(events: unknown[]): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "vibe-receipt-test-"));
@@ -147,6 +151,196 @@ describe("cost per line", () => {
 
   it("returns 0 with zero cost", () => {
     expect(computeCostPerLine(0, 100, 0)).toBe(0);
+  });
+});
+
+function assistantEvent(ts: string, stopReason: string) {
+  return {
+    type: "assistant",
+    timestamp: ts,
+    message: {
+      id: `msg_${ts}`,
+      model: "claude-opus-4-7",
+      content: [{ type: "text", text: "ok" }],
+      stop_reason: stopReason,
+      usage: { input_tokens: 10, output_tokens: 10, cache_creation_input_tokens: 0 },
+    },
+    requestId: `req_${ts}`,
+  };
+}
+
+describe("wait-then-go count", () => {
+  it("does not count when assistant ended cleanly", async () => {
+    const path = await makeFixture([
+      userEvent("2026-01-01T00:00:00Z", "first"),
+      assistantEvent("2026-01-01T00:00:05Z", "end_turn"),
+      userEvent("2026-01-01T00:01:00Z", "second"),
+    ]);
+    const p = await extractClaudePersonality(path);
+    expect(p.waitThenGoCount).toBe(0);
+  });
+
+  it("counts when user prompts arrive while assistant is in tool_use mode", async () => {
+    const path = await makeFixture([
+      userEvent("2026-01-01T00:00:00Z", "first"),
+      assistantEvent("2026-01-01T00:00:05Z", "tool_use"),
+      // user fires a new prompt while assistant is still working
+      userEvent("2026-01-01T00:00:10Z", "stop, do this instead"),
+    ]);
+    const p = await extractClaudePersonality(path);
+    expect(p.waitThenGoCount).toBe(1);
+  });
+
+  it("does not count after an ESC interrupt", async () => {
+    const path = await makeFixture([
+      userEvent("2026-01-01T00:00:00Z", "first"),
+      assistantEvent("2026-01-01T00:00:05Z", "tool_use"),
+      // tool_result wrapper with interrupted=true
+      {
+        type: "user",
+        timestamp: "2026-01-01T00:00:08Z",
+        message: {
+          role: "user",
+          content: [{ type: "tool_result", tool_use_id: "x", content: "" }],
+        },
+        toolUseResult: { interrupted: true },
+      },
+      userEvent("2026-01-01T00:00:10Z", "different request"),
+    ]);
+    const p = await extractClaudePersonality(path);
+    expect(p.waitThenGoCount).toBe(0);
+    expect(p.escInterrupts).toBe(1);
+  });
+
+  it("compact_boundary clears in-flight state", async () => {
+    const path = await makeFixture([
+      userEvent("2026-01-01T00:00:00Z", "first"),
+      assistantEvent("2026-01-01T00:00:05Z", "tool_use"),
+      { type: "system", subtype: "compact_boundary", timestamp: "2026-01-01T00:00:08Z" },
+      userEvent("2026-01-01T00:00:10Z", "after compact"),
+    ]);
+    const p = await extractClaudePersonality(path);
+    expect(p.waitThenGoCount).toBe(0);
+  });
+});
+
+describe("rate-limit hits", () => {
+  it("counts api_error events with HTTP status 429", async () => {
+    const path = await makeFixture([
+      {
+        type: "system",
+        subtype: "api_error",
+        timestamp: "2026-01-01T00:00:00Z",
+        error: { status: 429 },
+        retryInMs: 5000,
+      },
+      {
+        type: "system",
+        subtype: "api_error",
+        timestamp: "2026-01-01T00:01:00Z",
+        error: { status: 429 },
+        retryInMs: 3000,
+      },
+    ]);
+    const p = await extractClaudePersonality(path);
+    expect(p.rateLimitHits).toBe(2);
+    expect(p.rateLimitWaitMs).toBe(8000);
+  });
+
+  it("counts deeply-nested rate_limit_error type as fallback", async () => {
+    const path = await makeFixture([
+      {
+        type: "system",
+        subtype: "api_error",
+        timestamp: "2026-01-01T00:00:00Z",
+        error: { error: { error: { type: "rate_limit_error" } } },
+        retryInMs: 1000,
+      },
+    ]);
+    const p = await extractClaudePersonality(path);
+    expect(p.rateLimitHits).toBe(1);
+    expect(p.rateLimitWaitMs).toBe(1000);
+  });
+
+  it("ignores non-429 api_error events", async () => {
+    const path = await makeFixture([
+      {
+        type: "system",
+        subtype: "api_error",
+        timestamp: "2026-01-01T00:00:00Z",
+        error: { status: 500 },
+      },
+    ]);
+    const p = await extractClaudePersonality(path);
+    expect(p.rateLimitHits).toBe(0);
+  });
+
+  it("handles missing retryInMs gracefully", async () => {
+    const path = await makeFixture([
+      {
+        type: "system",
+        subtype: "api_error",
+        timestamp: "2026-01-01T00:00:00Z",
+        error: { status: 429 },
+        // no retryInMs
+      },
+    ]);
+    const p = await extractClaudePersonality(path);
+    expect(p.rateLimitHits).toBe(1);
+    expect(p.rateLimitWaitMs).toBe(0);
+  });
+});
+
+describe("burn rate peak", () => {
+  it("returns 0 with no events", () => {
+    expect(computeBurnRatePeak([])).toEqual({ tpm: 0, windowStartUtc: null });
+  });
+
+  it("returns the single event's tokens for one event", () => {
+    const t = Date.parse("2026-01-01T00:00:00Z");
+    const r = computeBurnRatePeak([{ ts: t, tokens: 500 }]);
+    expect(r.tpm).toBe(500);
+    expect(r.windowStartUtc).toBe("2026-01-01T00:00:00.000Z");
+  });
+
+  it("sums events that fit within a 60s window", () => {
+    const t0 = Date.parse("2026-01-01T00:00:00Z");
+    const r = computeBurnRatePeak([
+      { ts: t0, tokens: 100 },
+      { ts: t0 + 30_000, tokens: 200 },
+      { ts: t0 + 50_000, tokens: 300 },
+    ]);
+    expect(r.tpm).toBe(600);
+  });
+
+  it("excludes events outside the window", () => {
+    const t0 = Date.parse("2026-01-01T00:00:00Z");
+    const r = computeBurnRatePeak([
+      { ts: t0, tokens: 100 },
+      { ts: t0 + 60_001, tokens: 999 },
+    ]);
+    expect(r.tpm).toBe(999); // peak shifted to second event alone
+  });
+
+  it("identifies the highest peak across multiple windows", () => {
+    const t0 = Date.parse("2026-01-01T00:00:00Z");
+    const r = computeBurnRatePeak([
+      { ts: t0, tokens: 100 },
+      { ts: t0 + 10_000, tokens: 100 },
+      // gap
+      { ts: t0 + 200_000, tokens: 1000 }, // big single event
+      { ts: t0 + 210_000, tokens: 500 },
+    ]);
+    expect(r.tpm).toBe(1500);
+  });
+
+  it("handles unsorted input", () => {
+    const t0 = Date.parse("2026-01-01T00:00:00Z");
+    const r = computeBurnRatePeak([
+      { ts: t0 + 50_000, tokens: 200 },
+      { ts: t0, tokens: 100 },
+    ]);
+    expect(r.tpm).toBe(300);
   });
 });
 

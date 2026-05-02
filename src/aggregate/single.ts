@@ -4,7 +4,11 @@ import type { NormalizedSession } from "../data/types.js";
 import { topToolStats } from "../data/types.js";
 import { computeFirstPromptFingerprint } from "../redact/fingerprint.js";
 import { promptStatsOf } from "./prompt-stats.js";
-import { computeCostPerLine, computeMostEditedFile } from "./derive-stats.js";
+import {
+  computeBurnRatePeak,
+  computeCostPerLine,
+  computeMostEditedFile,
+} from "./derive-stats.js";
 
 export function buildSingleReceipt(ns: NormalizedSession): Receipt {
   const scope: ReceiptScope = { kind: "single", sessionId: ns.sessionId };
@@ -12,6 +16,7 @@ export function buildSingleReceipt(ns: NormalizedSession): Receipt {
   const cacheHitRatio = totalIn > 0 ? ns.cacheReadTokens / totalIn : 0;
 
   const fp = computeFirstPromptFingerprint(ns.firstPrompt);
+  const burn = computeBurnRatePeak(ns.tokenEvents);
 
   return {
     scope,
@@ -47,8 +52,8 @@ export function buildSingleReceipt(ns: NormalizedSession): Receipt {
       models: ns.models,
       rateLimitHits: ns.rateLimitHits,
       rateLimitWaitMs: ns.rateLimitWaitMs,
-      burnRatePeakTokensPerMin: 0,
-      burnRatePeakWindowUtc: null,
+      burnRatePeakTokensPerMin: burn.tpm,
+      burnRatePeakWindowUtc: burn.windowStartUtc,
       costPerLineUsd: computeCostPerLine(ns.totalCostUsd, ns.linesAdded, ns.linesRemoved),
     },
 

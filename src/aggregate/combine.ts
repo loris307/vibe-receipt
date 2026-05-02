@@ -4,7 +4,12 @@ import type { NormalizedSession, Source } from "../data/types.js";
 import { topToolStats } from "../data/types.js";
 import { computeFirstPromptFingerprint } from "../redact/fingerprint.js";
 import { promptStatsOf } from "./prompt-stats.js";
-import { computeCostPerLine, computeMostEditedFile } from "./derive-stats.js";
+import {
+  computeBurnRatePeak,
+  computeCostPerLine,
+  computeMostEditedFile,
+  type TokenEvent,
+} from "./derive-stats.js";
 
 const TOP_FILES_LIMIT = 5;
 const TOOL_LIMIT = 5;
@@ -66,6 +71,7 @@ export function buildCombinedReceipt(
   // v0.2 — cost
   let rateLimitHits = 0;
   let rateLimitWaitMs = 0;
+  const allTokenEvents: TokenEvent[] = [];
   const skillSet = new Set<string>();
   const slashSet = new Set<string>();
   const modelSet = new Set<string>();
@@ -136,6 +142,7 @@ export function buildCombinedReceipt(
     politenessSorry += s.politenessSorry;
     rateLimitHits += s.rateLimitHits;
     rateLimitWaitMs += s.rateLimitWaitMs;
+    for (const ev of s.tokenEvents) allTokenEvents.push(ev);
     if (s.longestSoloStretchMs > longestSoloStretchMs) {
       longestSoloStretchMs = s.longestSoloStretchMs;
       longestSoloStretchStartUtc = s.longestSoloStretchStartUtc;
@@ -193,6 +200,7 @@ export function buildCombinedReceipt(
   subagents.sort((a, b) => b.durationMs - a.durationMs);
 
   const fp = computeFirstPromptFingerprint(firstPromptCandidate?.text ?? null);
+  const burn = computeBurnRatePeak(allTokenEvents);
 
   return {
     scope,
@@ -224,8 +232,8 @@ export function buildCombinedReceipt(
       models: Array.from(modelSet),
       rateLimitHits,
       rateLimitWaitMs,
-      burnRatePeakTokensPerMin: 0,
-      burnRatePeakWindowUtc: null,
+      burnRatePeakTokensPerMin: burn.tpm,
+      burnRatePeakWindowUtc: burn.windowStartUtc,
       costPerLineUsd: computeCostPerLine(
         totalUsd,
         fileEntries.reduce((s, f) => s + f.added, 0),
