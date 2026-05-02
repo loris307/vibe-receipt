@@ -624,9 +624,6 @@ export function VibeCard({ receipt, s, size, height }: CardProps): React.ReactEl
         {receipt.personality.permissionFlips > 0 ? (
           <Row label={s.labelPerm} value={String(receipt.personality.permissionFlips)} />
         ) : null}
-        {receipt.personality.yoloEvents > 0 ? (
-          <Row label={s.labelYolo} value={`× ${receipt.personality.yoloEvents}`} />
-        ) : null}
         {receipt.personality.thinkingMs > 1000 ? (
           <Row label={s.labelDeep} value={formatDurationMs(receipt.personality.thinkingMs)} />
         ) : null}

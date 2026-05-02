@@ -64,7 +64,6 @@ export function estimateReceiptHeight(r: Receipt, base: SizePreset): number {
   if (r.time.afkMs > 1000) pRows++;
   if (r.personality.escInterrupts > 0) pRows++;
   if (r.personality.permissionFlips > 0) pRows++;
-  if (r.personality.yoloEvents > 0) pRows++;
   if (r.personality.thinkingMs > 1000) pRows++;
   if (r.personality.skills.length > 0) pRows++;
   if (r.personality.slashCommands.length > 0) pRows++;

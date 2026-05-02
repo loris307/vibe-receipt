@@ -170,8 +170,6 @@ export function renderAnsi(receipt: Receipt, s: Strings): string {
     lines.push(row(s.labelEsc, String(receipt.personality.escInterrupts)));
   if (receipt.personality.permissionFlips > 0)
     lines.push(row(s.labelPerm, String(receipt.personality.permissionFlips)));
-  if (receipt.personality.yoloEvents > 0)
-    lines.push(row(s.labelYolo, `× ${receipt.personality.yoloEvents}`));
   if (receipt.personality.thinkingMs > 1000)
     lines.push(row(s.labelDeep, formatDurationMs(receipt.personality.thinkingMs)));
   if (receipt.personality.skills.length > 0)
