@@ -71,6 +71,7 @@ export function buildSingleReceipt(ns: NormalizedSession): Receipt {
       hookErrors: ns.hookErrors,
       longestUserMsgChars: ns.longestUserMsgChars,
       ...promptStatsOf(ns.promptLengths),
+      shortestPromptText: ns.shortestPromptText,
     },
 
     firstPrompt: fp,

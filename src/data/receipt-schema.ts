@@ -97,6 +97,7 @@ export const ReceiptSchema = v.object({
     longestPromptChars: v.number(),
     shortestPromptChars: v.number(),
     avgPromptChars: v.number(),
+    shortestPromptText: v.nullable(v.string()),
   }),
 
   firstPrompt: v.object({
@@ -104,6 +105,7 @@ export const ReceiptSchema = v.object({
     charCount: v.number(),
     moodEmoji: v.string(),
     fingerprintSha: v.string(),
+    preview: v.nullable(v.string()),
     revealed: v.nullable(v.string()),
   }),
 });

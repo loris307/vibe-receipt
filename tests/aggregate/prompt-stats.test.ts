@@ -93,16 +93,22 @@ describe("Codex extractor: promptLengths", () => {
 });
 
 describe("Receipt: prompt stats land on personality block", () => {
-  it("buildSingleReceipt populates promptCount/longest/shortest/avg", async () => {
+  it("buildSingleReceipt populates promptCount/longest/shortest/avg + shortestPromptText + firstPrompt.preview", async () => {
     const ns = await loadClaudeFromFile(SHORT);
     const r = buildSingleReceipt(ns);
     expect(r.personality.promptCount).toBe(1);
     expect(r.personality.longestPromptChars).toBeGreaterThan(50);
     expect(r.personality.shortestPromptChars).toBe(r.personality.longestPromptChars);
     expect(r.personality.avgPromptChars).toBe(r.personality.longestPromptChars);
+    // shortest text == the only prompt
+    expect(r.personality.shortestPromptText).toContain("CSV files");
+    // first preview is the cleaned first prompt, capped to ~60 chars + …
+    expect(r.firstPrompt.preview).toBeTruthy();
+    expect(r.firstPrompt.preview!.length).toBeLessThanOrEqual(61);
+    expect(r.firstPrompt.preview!.startsWith("Build me")).toBe(true);
   });
 
-  it("buildCombinedReceipt aggregates promptLengths across sessions", async () => {
+  it("buildCombinedReceipt aggregates promptLengths across sessions and picks min shortest", async () => {
     const claude = await loadClaudeFromFile(SHORT); // 1 prompt, ~73 chars
     const codex = await loadCodexFromFile(CODEX); //   1 prompt, ~34 chars
     const r = buildCombinedReceipt(
@@ -118,6 +124,9 @@ describe("Receipt: prompt stats land on personality block", () => {
         (r.personality.longestPromptChars + r.personality.shortestPromptChars) / 2,
       ),
     );
+    // shortest text comes from the codex session
+    expect(r.personality.shortestPromptText).toContain("CSV helper");
+    expect(r.personality.shortestPromptText!.length).toBe(r.personality.shortestPromptChars);
   });
 });
 

@@ -6,6 +6,7 @@ import type { SizePreset } from "./sizes.js";
 import { SIZES } from "./sizes.js";
 import { compactNumber, formatPercent, formatUsd } from "../util/compact-number.js";
 import { formatDurationMs } from "../util/duration.js";
+import { truncateShortestText } from "../redact/smart-redact.js";
 
 interface CardProps {
   receipt: Receipt;
@@ -462,20 +463,6 @@ export function VibeCard({ receipt, s, size }: CardProps): React.ReactElement {
         <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
           <Divider />
           <SectionHeader>{s.sectionFirstPrompt}</SectionHeader>
-          <div style={{ display: "flex", marginBottom: 12, width: "100%" }}>
-            <span
-              style={{
-                fontFamily: theme.monoFamily,
-                fontWeight: 400,
-                fontSize: 22,
-                color: theme.ink,
-              }}
-            >
-              {receipt.firstPrompt.revealed
-                ? `"${receipt.firstPrompt.revealed}"`
-                : `${receipt.firstPrompt.wordCount} ${s.fpUnit}  ·  ${receipt.firstPrompt.moodEmoji}  ·  ${s.fpFooterShaPrefix}${receipt.firstPrompt.fingerprintSha}`}
-            </span>
-          </div>
           {receipt.personality.promptCount > 0 ? (
             <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
               <Row label={s.labelPrompts} value={String(receipt.personality.promptCount)} />
@@ -484,15 +471,93 @@ export function VibeCard({ receipt, s, size }: CardProps): React.ReactElement {
                 value={`${receipt.personality.longestPromptChars} chars`}
               />
               <Row
-                label={s.labelShortestPrompt}
-                value={`${receipt.personality.shortestPromptChars} chars`}
-              />
-              <Row
                 label={s.labelAvgPrompt}
                 value={`${receipt.personality.avgPromptChars} chars`}
               />
             </div>
           ) : null}
+          {receipt.firstPrompt.preview ? (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "row",
+                width: "100%",
+                marginTop: 12,
+              }}
+            >
+              <div style={{ display: "flex", width: 130 }}>
+                <span
+                  style={{
+                    fontFamily: theme.monoFamily,
+                    fontWeight: 400,
+                    fontSize: 22,
+                    color: theme.inkSoft,
+                  }}
+                >
+                  {s.labelFirstPreview}
+                </span>
+              </div>
+              <div style={{ display: "flex", flex: 1 }}>
+                <span
+                  style={{
+                    fontFamily: theme.monoFamily,
+                    fontWeight: 400,
+                    fontSize: 22,
+                    color: theme.ink,
+                  }}
+                >
+                  {`"${receipt.firstPrompt.preview}"`}
+                </span>
+              </div>
+            </div>
+          ) : null}
+          {receipt.personality.shortestPromptText ? (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "row",
+                width: "100%",
+                marginTop: 8,
+              }}
+            >
+              <div style={{ display: "flex", width: 130 }}>
+                <span
+                  style={{
+                    fontFamily: theme.monoFamily,
+                    fontWeight: 400,
+                    fontSize: 22,
+                    color: theme.inkSoft,
+                  }}
+                >
+                  {s.labelShortestText}
+                </span>
+              </div>
+              <div style={{ display: "flex", flex: 1 }}>
+                <span
+                  style={{
+                    fontFamily: theme.monoFamily,
+                    fontWeight: 400,
+                    fontSize: 22,
+                    color: theme.ink,
+                  }}
+                >
+                  {`"${truncateShortestText(receipt.personality.shortestPromptText)}" (${receipt.personality.shortestPromptChars} chars)`}
+                </span>
+              </div>
+            </div>
+          ) : null}
+          <div style={{ display: "flex", marginTop: 10, width: "100%" }}>
+            <span
+              style={{
+                fontFamily: theme.monoFamily,
+                fontWeight: 400,
+                fontSize: 18,
+                color: theme.inkMuted,
+              }}
+            >
+              {`${receipt.firstPrompt.moodEmoji}  ·  ${s.fpFooterShaPrefix}${receipt.firstPrompt.fingerprintSha}`}
+            </span>
+          </div>
         </div>
       ) : null}
 

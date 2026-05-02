@@ -30,6 +30,7 @@ export interface CodexPersonality {
 
   thinkingMs: number;
   firstPrompt: string | null;
+  shortestPromptText: string | null;
   longestUserMsgChars: number;
   promptLengths: number[];
 }
@@ -94,6 +95,7 @@ export async function extractCodexPersonality(filePath: string): Promise<CodexPe
     subagents: [],
     thinkingMs: 0,
     firstPrompt: null,
+    shortestPromptText: null,
     longestUserMsgChars: 0,
     promptLengths: [],
   };
@@ -144,6 +146,12 @@ export async function extractCodexPersonality(filePath: string): Promise<CodexPe
           out.promptLengths.push(text.length);
           if (!out.firstPrompt) out.firstPrompt = text;
           if (text.length > out.longestUserMsgChars) out.longestUserMsgChars = text.length;
+          if (
+            out.shortestPromptText === null ||
+            text.length < out.shortestPromptText.length
+          ) {
+            out.shortestPromptText = text;
+          }
         }
       } else if (innerType === "function_call") {
         const name = String(payload.name ?? "");

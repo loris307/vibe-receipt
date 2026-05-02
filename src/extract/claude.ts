@@ -97,6 +97,7 @@ function personalityToNormalized(p: Awaited<ReturnType<typeof extractClaudePerso
     promptLengths: p.promptLengths,
 
     firstPrompt: p.firstPrompt,
+    shortestPromptText: p.shortestPromptText,
   };
 }
 

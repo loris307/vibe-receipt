@@ -5,7 +5,17 @@ export interface FirstPromptFingerprint {
   charCount: number;
   moodEmoji: string;
   fingerprintSha: string;
+  preview: string | null;
   revealed: string | null;
+}
+
+const PREVIEW_MAX_CHARS = 60;
+
+export function makePreview(s: string | null, max = PREVIEW_MAX_CHARS): string | null {
+  if (!s) return null;
+  const collapsed = s.replace(/\s+/g, " ").trim();
+  if (collapsed.length <= max) return collapsed;
+  return `${collapsed.slice(0, max).trimEnd()}…`;
 }
 
 /**
@@ -81,6 +91,7 @@ export function computeFirstPromptFingerprint(prompt: string | null): FirstPromp
       charCount: 0,
       moodEmoji: ASCII_NEUTRAL,
       fingerprintSha: "—",
+      preview: null,
       revealed: null,
     };
   }
@@ -95,6 +106,7 @@ export function computeFirstPromptFingerprint(prompt: string | null): FirstPromp
     charCount: trimmed.length,
     moodEmoji: moodEmojiOf(trimmed),
     fingerprintSha,
+    preview: makePreview(trimmed),
     revealed: null,
   };
 }

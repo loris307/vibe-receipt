@@ -13,7 +13,7 @@ export const en = {
   sectionTools: "TOP TOOLS",
   sectionSubagents: "SUBAGENTS",
   sectionPersonality: "PERSONALITY",
-  sectionFirstPrompt: "FIRST PROMPT",
+  sectionFirstPrompt: "PROMPTING",
 
   labelDuration: "duration",
   labelWallWindow: "wall window",
@@ -41,9 +41,11 @@ export const en = {
   labelTruncated: "truncated",
   labelHookErrors: "hook errors",
   labelPrompts: "prompts",
-  labelLongestPrompt: "longest prompt",
-  labelShortestPrompt: "shortest prompt",
-  labelAvgPrompt: "avg prompt",
+  labelLongestPrompt: "longest",
+  labelShortestPrompt: "shortest",
+  labelAvgPrompt: "avg",
+  labelFirstPreview: "first",
+  labelShortestText: "shortest",
 
   fpUnit: "words",
   fpFooterShaPrefix: "sha:",

@@ -15,7 +15,7 @@ export const de: Strings = {
   sectionTools: "TOP TOOLS",
   sectionSubagents: "SUB-AGENTS",
   sectionPersonality: "CHARAKTER",
-  sectionFirstPrompt: "ERSTER PROMPT",
+  sectionFirstPrompt: "PROMPTING",
 
   labelDuration: "dauer",
   labelWallWindow: "fenster",
@@ -46,6 +46,8 @@ export const de: Strings = {
   labelLongestPrompt: "längster",
   labelShortestPrompt: "kürzester",
   labelAvgPrompt: "durchschnitt",
+  labelFirstPreview: "erster",
+  labelShortestText: "kürzester",
 
   fpUnit: "wörter",
   fpFooterShaPrefix: "sha:",

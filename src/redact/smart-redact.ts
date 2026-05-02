@@ -48,6 +48,15 @@ export function applyRedaction(receipt: Receipt, reveal: RevealOpts = NO_REVEAL)
   };
 }
 
+/** Truncate the shortest-prompt text shown on the card. Long "shortest"s are still possible
+ *  (a session where every prompt is huge), so cap at 80 chars. */
+export function truncateShortestText(s: string | null, max = 80): string | null {
+  if (!s) return null;
+  const collapsed = s.replace(/\s+/g, " ").trim();
+  if (collapsed.length <= max) return collapsed;
+  return `${collapsed.slice(0, max).trimEnd()}…`;
+}
+
 function truncateForReveal(s: string | null): string | null {
   if (!s) return null;
   if (s.length <= REVEAL_PROMPT_MAX_CHARS) return s;

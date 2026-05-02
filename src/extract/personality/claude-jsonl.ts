@@ -42,6 +42,7 @@ export interface ClaudePersonality {
   promptLengths: number[];
 
   firstPrompt: string | null;
+  shortestPromptText: string | null;
 
   // (stable across the session in practice; may have multiple values across compactions)
   claudeCodeVersion: string | null;
@@ -172,6 +173,7 @@ export async function extractClaudePersonality(
     promptLengths: [],
 
     firstPrompt: null,
+    shortestPromptText: null,
     claudeCodeVersion: null,
   };
 
@@ -247,10 +249,16 @@ export async function extractClaudePersonality(
       }
       const realPrompt = isRealUserPrompt(evt);
       if (realPrompt) {
-        out.promptLengths.push(realPrompt.real.length);
+        const len = realPrompt.real.length;
+        out.promptLengths.push(len);
         if (!out.firstPrompt) out.firstPrompt = realPrompt.real;
-        if (realPrompt.real.length > out.longestUserMsgChars)
-          out.longestUserMsgChars = realPrompt.real.length;
+        if (len > out.longestUserMsgChars) out.longestUserMsgChars = len;
+        if (
+          out.shortestPromptText === null ||
+          len < out.shortestPromptText.length
+        ) {
+          out.shortestPromptText = realPrompt.real;
+        }
       }
       // tool_result + toolUseResult — count file/bash effects
       const tur = evt.toolUseResult;

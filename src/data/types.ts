@@ -54,6 +54,8 @@ export interface NormalizedSession {
   promptLengths: number[];
 
   firstPrompt: string | null;
+  /** Shortest real user prompt (full text). Null if no real prompts. */
+  shortestPromptText: string | null;
 
   inFlight?: boolean;
   warnings?: string[];

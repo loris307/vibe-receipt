@@ -142,6 +142,7 @@ export const loadCodexSessions: SourceLoader = async (opts) => {
       promptLengths: p.promptLengths,
 
       firstPrompt: p.firstPrompt,
+      shortestPromptText: p.shortestPromptText,
     };
     if (!passesFilters(ns, opts)) continue;
     out.push(ns);
@@ -203,5 +204,6 @@ export async function loadCodexFromFile(filePath: string): Promise<NormalizedSes
     promptLengths: p.promptLengths,
 
     firstPrompt: p.firstPrompt,
+    shortestPromptText: p.shortestPromptText,
   };
 }

@@ -52,6 +52,7 @@ export function buildCombinedReceipt(
   let hookErrors = 0;
   let longestUserMsgChars = 0;
   const promptLengths: number[] = [];
+  let shortestPromptText: string | null = null;
   const skillSet = new Set<string>();
   const slashSet = new Set<string>();
   const modelSet = new Set<string>();
@@ -112,6 +113,13 @@ export function buildCombinedReceipt(
     if (s.longestUserMsgChars > longestUserMsgChars)
       longestUserMsgChars = s.longestUserMsgChars;
     for (const len of s.promptLengths) promptLengths.push(len);
+    if (
+      s.shortestPromptText !== null &&
+      (shortestPromptText === null ||
+        s.shortestPromptText.length < shortestPromptText.length)
+    ) {
+      shortestPromptText = s.shortestPromptText;
+    }
 
     for (const sk of s.skills) skillSet.add(sk);
     for (const sl of s.slashCommands) slashSet.add(sl);
@@ -206,6 +214,7 @@ export function buildCombinedReceipt(
       hookErrors,
       longestUserMsgChars,
       ...promptStatsOf(promptLengths),
+      shortestPromptText,
     },
     firstPrompt: fp,
   };
