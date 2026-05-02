@@ -32,8 +32,75 @@ export const TopFileSchema = v.object({
   path: v.string(),
   added: v.number(),
   removed: v.number(),
+  editCount: v.optional(v.number()),
 });
 export type TopFile = v.InferOutput<typeof TopFileSchema>;
+
+export const ArchetypeKeySchema = v.union([
+  v.literal("specifier"),
+  v.literal("vibe-coder"),
+  v.literal("fixer"),
+  v.literal("researcher"),
+  v.literal("firefighter"),
+  v.literal("trustfall-pilot"),
+  v.literal("esc-rager"),
+  v.literal("night-owl"),
+]);
+export type ArchetypeKey = v.InferOutput<typeof ArchetypeKeySchema>;
+
+export const PolitenessSchema = v.object({
+  please: v.number(),
+  thanks: v.number(),
+  sorry: v.number(),
+  total: v.number(),
+});
+export type Politeness = v.InferOutput<typeof PolitenessSchema>;
+
+export const MostEditedFileSchema = v.object({
+  path: v.string(),
+  editCount: v.number(),
+  added: v.number(),
+  removed: v.number(),
+});
+export type MostEditedFile = v.InferOutput<typeof MostEditedFileSchema>;
+
+export const ArchetypeSchema = v.object({
+  key: ArchetypeKeySchema,
+  taglineKey: v.string(),
+  scores: v.record(v.string(), v.number()),
+});
+export type Archetype = v.InferOutput<typeof ArchetypeSchema>;
+
+export const VsLastSessionSchema = v.object({
+  deltaTokensPct: v.number(),
+  deltaCostPct: v.number(),
+  deltaDurationPct: v.number(),
+  sessionId: v.string(),
+  recordedAt: v.string(),
+});
+export type VsLastSession = v.InferOutput<typeof VsLastSessionSchema>;
+
+export const VsLast7DaysSchema = v.object({
+  sessionsInWindow: v.number(),
+  tokensRankInWindow: v.number(),
+  longestSessionInWindow: v.boolean(),
+  medianTokens: v.number(),
+  medianCostUsd: v.number(),
+});
+export type VsLast7Days = v.InferOutput<typeof VsLast7DaysSchema>;
+
+export const ComparisonSchema = v.object({
+  vsLastSession: v.nullable(VsLastSessionSchema),
+  vsLast7Days: v.nullable(VsLast7DaysSchema),
+});
+export type Comparison = v.InferOutput<typeof ComparisonSchema>;
+
+export const AchievementSchema = v.object({
+  key: v.string(),
+  labelKey: v.string(),
+  iconGlyph: v.string(),
+});
+export type Achievement = v.InferOutput<typeof AchievementSchema>;
 
 export const ReceiptSchema = v.object({
   scope: ReceiptScopeSchema,
@@ -54,6 +121,9 @@ export const ReceiptSchema = v.object({
     activeMs: v.number(),
     afkMs: v.number(),
     afkRecaps: v.array(v.string()),
+    longestSoloStretchMs: v.number(),
+    longestSoloStretchStartUtc: v.nullable(v.string()),
+    longestSoloStretchEndUtc: v.nullable(v.string()),
   }),
 
   cost: v.object({
@@ -64,6 +134,11 @@ export const ReceiptSchema = v.object({
     cacheReadTokens: v.number(),
     cacheHitRatio: v.number(),
     models: v.array(v.string()),
+    rateLimitHits: v.number(),
+    rateLimitWaitMs: v.number(),
+    burnRatePeakTokensPerMin: v.number(),
+    burnRatePeakWindowUtc: v.nullable(v.string()),
+    costPerLineUsd: v.number(),
   }),
 
   work: v.object({
@@ -74,6 +149,7 @@ export const ReceiptSchema = v.object({
     bashCommands: v.number(),
     webFetches: v.number(),
     userModified: v.number(),
+    mostEditedFile: v.nullable(MostEditedFileSchema),
   }),
 
   tools: v.object({
@@ -98,6 +174,8 @@ export const ReceiptSchema = v.object({
     shortestPromptChars: v.number(),
     avgPromptChars: v.number(),
     shortestPromptText: v.nullable(v.string()),
+    waitThenGoCount: v.number(),
+    politenessScore: PolitenessSchema,
   }),
 
   firstPrompt: v.object({
@@ -108,5 +186,9 @@ export const ReceiptSchema = v.object({
     preview: v.nullable(v.string()),
     revealed: v.nullable(v.string()),
   }),
+
+  archetype: ArchetypeSchema,
+  comparison: v.nullable(ComparisonSchema),
+  achievements: v.array(AchievementSchema),
 });
 export type Receipt = v.InferOutput<typeof ReceiptSchema>;

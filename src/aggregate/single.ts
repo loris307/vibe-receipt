@@ -31,6 +31,9 @@ export function buildSingleReceipt(ns: NormalizedSession): Receipt {
       activeMs: ns.activeMs,
       afkMs: ns.afkMs,
       afkRecaps: ns.afkRecaps,
+      longestSoloStretchMs: ns.longestSoloStretchMs,
+      longestSoloStretchStartUtc: ns.longestSoloStretchStartUtc,
+      longestSoloStretchEndUtc: ns.longestSoloStretchEndUtc,
     },
 
     cost: {
@@ -41,6 +44,11 @@ export function buildSingleReceipt(ns: NormalizedSession): Receipt {
       cacheReadTokens: ns.cacheReadTokens,
       cacheHitRatio,
       models: ns.models,
+      rateLimitHits: ns.rateLimitHits,
+      rateLimitWaitMs: ns.rateLimitWaitMs,
+      burnRatePeakTokensPerMin: 0,
+      burnRatePeakWindowUtc: null,
+      costPerLineUsd: 0,
     },
 
     work: {
@@ -51,6 +59,7 @@ export function buildSingleReceipt(ns: NormalizedSession): Receipt {
       bashCommands: ns.bashCommands,
       webFetches: ns.webFetches,
       userModified: ns.userModified,
+      mostEditedFile: null,
     },
 
     tools: {
@@ -72,8 +81,23 @@ export function buildSingleReceipt(ns: NormalizedSession): Receipt {
       longestUserMsgChars: ns.longestUserMsgChars,
       ...promptStatsOf(ns.promptLengths),
       shortestPromptText: ns.shortestPromptText,
+      waitThenGoCount: ns.waitThenGoCount,
+      politenessScore: {
+        please: ns.politenessPlease,
+        thanks: ns.politenessThanks,
+        sorry: ns.politenessSorry,
+        total: ns.politenessPlease + ns.politenessThanks + ns.politenessSorry,
+      },
     },
 
     firstPrompt: fp,
+
+    archetype: {
+      key: "vibe-coder",
+      taglineKey: "archetype.vibe-coder.tagline",
+      scores: {},
+    },
+    comparison: null,
+    achievements: [],
   };
 }

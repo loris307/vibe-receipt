@@ -33,6 +33,20 @@ export interface CodexPersonality {
   shortestPromptText: string | null;
   longestUserMsgChars: number;
   promptLengths: number[];
+  promptTexts: string[];
+  promptTimestamps: string[];
+
+  // v0.2 fields (codex extractor leaves most as defaults; computed by aggregator)
+  longestSoloStretchMs: number;
+  longestSoloStretchStartUtc: string | null;
+  longestSoloStretchEndUtc: string | null;
+  waitThenGoCount: number;
+  politenessPlease: number;
+  politenessThanks: number;
+  politenessSorry: number;
+  rateLimitHits: number;
+  rateLimitWaitMs: number;
+  tokenEvents: { ts: number; tokens: number }[];
 }
 
 const TOP_FILES_LIMIT = 5;
@@ -114,6 +128,18 @@ export async function extractCodexPersonality(
     shortestPromptText: null,
     longestUserMsgChars: 0,
     promptLengths: [],
+    promptTexts: [],
+    promptTimestamps: [],
+    longestSoloStretchMs: 0,
+    longestSoloStretchStartUtc: null,
+    longestSoloStretchEndUtc: null,
+    waitThenGoCount: 0,
+    politenessPlease: 0,
+    politenessThanks: 0,
+    politenessSorry: 0,
+    rateLimitHits: 0,
+    rateLimitWaitMs: 0,
+    tokenEvents: [],
   };
 
   if (events.length === 0) return out;

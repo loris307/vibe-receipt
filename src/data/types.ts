@@ -55,9 +55,29 @@ export interface NormalizedSession {
    *  cannot enumerate user inputs (e.g. minimal Codex extracts). */
   promptLengths: number[];
 
+  /** Full text of every real user prompt in chronological order. Used for politeness scoring,
+   *  fixer-keyword detection, etc. Empty for sources that cannot enumerate prompts. */
+  promptTexts: string[];
+  /** ISO8601 timestamp per real user prompt, same length as promptTexts. */
+  promptTimestamps: string[];
+
   firstPrompt: string | null;
   /** Shortest real user prompt (full text). Null if no real prompts. */
   shortestPromptText: string | null;
+
+  // v0.2 fields — defaulted by extractors that don't compute them
+  longestSoloStretchMs: number;
+  longestSoloStretchStartUtc: string | null;
+  longestSoloStretchEndUtc: string | null;
+  waitThenGoCount: number;
+  politenessPlease: number;
+  politenessThanks: number;
+  politenessSorry: number;
+  rateLimitHits: number;
+  rateLimitWaitMs: number;
+  /** Stream of (timestamp_ms, tokens) pairs for burn-rate peak computation.
+   *  tokens = input + output + cacheCreate per assistant message. */
+  tokenEvents: { ts: number; tokens: number }[];
 
   inFlight?: boolean;
   warnings?: string[];

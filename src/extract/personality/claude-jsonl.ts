@@ -40,9 +40,23 @@ export interface ClaudePersonality {
   hookErrors: number;
   longestUserMsgChars: number;
   promptLengths: number[];
+  promptTexts: string[];
+  promptTimestamps: string[];
 
   firstPrompt: string | null;
   shortestPromptText: string | null;
+
+  // v0.2 fields
+  longestSoloStretchMs: number;
+  longestSoloStretchStartUtc: string | null;
+  longestSoloStretchEndUtc: string | null;
+  waitThenGoCount: number;
+  politenessPlease: number;
+  politenessThanks: number;
+  politenessSorry: number;
+  rateLimitHits: number;
+  rateLimitWaitMs: number;
+  tokenEvents: { ts: number; tokens: number }[];
 
   // (stable across the session in practice; may have multiple values across compactions)
   claudeCodeVersion: string | null;
@@ -186,9 +200,23 @@ export async function extractClaudePersonality(
     hookErrors: 0,
     longestUserMsgChars: 0,
     promptLengths: [],
+    promptTexts: [],
+    promptTimestamps: [],
 
     firstPrompt: null,
     shortestPromptText: null,
+
+    longestSoloStretchMs: 0,
+    longestSoloStretchStartUtc: null,
+    longestSoloStretchEndUtc: null,
+    waitThenGoCount: 0,
+    politenessPlease: 0,
+    politenessThanks: 0,
+    politenessSorry: 0,
+    rateLimitHits: 0,
+    rateLimitWaitMs: 0,
+    tokenEvents: [],
+
     claudeCodeVersion: null,
   };
 

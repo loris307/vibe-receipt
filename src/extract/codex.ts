@@ -144,9 +144,22 @@ export const loadCodexSessions: SourceLoader = async (opts) => {
       hookErrors: 0,
       longestUserMsgChars: p.longestUserMsgChars,
       promptLengths: p.promptLengths,
+      promptTexts: p.promptTexts,
+      promptTimestamps: p.promptTimestamps,
 
       firstPrompt: p.firstPrompt,
       shortestPromptText: p.shortestPromptText,
+
+      longestSoloStretchMs: p.longestSoloStretchMs,
+      longestSoloStretchStartUtc: p.longestSoloStretchStartUtc,
+      longestSoloStretchEndUtc: p.longestSoloStretchEndUtc,
+      waitThenGoCount: p.waitThenGoCount,
+      politenessPlease: p.politenessPlease,
+      politenessThanks: p.politenessThanks,
+      politenessSorry: p.politenessSorry,
+      rateLimitHits: p.rateLimitHits,
+      rateLimitWaitMs: p.rateLimitWaitMs,
+      tokenEvents: p.tokenEvents,
     };
     if (!passesFilters(ns, opts)) continue;
     out.push(ns);
@@ -206,8 +219,21 @@ export async function loadCodexFromFile(filePath: string): Promise<NormalizedSes
     hookErrors: 0,
     longestUserMsgChars: p.longestUserMsgChars,
     promptLengths: p.promptLengths,
+    promptTexts: p.promptTexts,
+    promptTimestamps: p.promptTimestamps,
 
     firstPrompt: p.firstPrompt,
     shortestPromptText: p.shortestPromptText,
+
+    longestSoloStretchMs: p.longestSoloStretchMs,
+    longestSoloStretchStartUtc: p.longestSoloStretchStartUtc,
+    longestSoloStretchEndUtc: p.longestSoloStretchEndUtc,
+    waitThenGoCount: p.waitThenGoCount,
+    politenessPlease: p.politenessPlease,
+    politenessThanks: p.politenessThanks,
+    politenessSorry: p.politenessSorry,
+    rateLimitHits: p.rateLimitHits,
+    rateLimitWaitMs: p.rateLimitWaitMs,
+    tokenEvents: p.tokenEvents,
   };
 }

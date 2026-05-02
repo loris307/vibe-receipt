@@ -52,6 +52,19 @@ export function buildCombinedReceipt(
   let longestUserMsgChars = 0;
   const promptLengths: number[] = [];
   let shortestPromptText: string | null = null;
+
+  // v0.2 — time
+  let longestSoloStretchMs = 0;
+  let longestSoloStretchStartUtc: string | null = null;
+  let longestSoloStretchEndUtc: string | null = null;
+  // v0.2 — personality
+  let waitThenGoCount = 0;
+  let politenessPlease = 0;
+  let politenessThanks = 0;
+  let politenessSorry = 0;
+  // v0.2 — cost
+  let rateLimitHits = 0;
+  let rateLimitWaitMs = 0;
   const skillSet = new Set<string>();
   const slashSet = new Set<string>();
   const modelSet = new Set<string>();
@@ -109,6 +122,18 @@ export function buildCombinedReceipt(
     thinkingMs += s.thinkingMs;
     truncatedOutputs += s.truncatedOutputs;
     hookErrors += s.hookErrors;
+
+    waitThenGoCount += s.waitThenGoCount;
+    politenessPlease += s.politenessPlease;
+    politenessThanks += s.politenessThanks;
+    politenessSorry += s.politenessSorry;
+    rateLimitHits += s.rateLimitHits;
+    rateLimitWaitMs += s.rateLimitWaitMs;
+    if (s.longestSoloStretchMs > longestSoloStretchMs) {
+      longestSoloStretchMs = s.longestSoloStretchMs;
+      longestSoloStretchStartUtc = s.longestSoloStretchStartUtc;
+      longestSoloStretchEndUtc = s.longestSoloStretchEndUtc;
+    }
     if (s.longestUserMsgChars > longestUserMsgChars)
       longestUserMsgChars = s.longestUserMsgChars;
     for (const len of s.promptLengths) promptLengths.push(len);
@@ -178,6 +203,9 @@ export function buildCombinedReceipt(
       activeMs,
       afkMs,
       afkRecaps,
+      longestSoloStretchMs,
+      longestSoloStretchStartUtc,
+      longestSoloStretchEndUtc,
     },
     cost: {
       totalUsd,
@@ -187,6 +215,11 @@ export function buildCombinedReceipt(
       cacheReadTokens,
       cacheHitRatio,
       models: Array.from(modelSet),
+      rateLimitHits,
+      rateLimitWaitMs,
+      burnRatePeakTokensPerMin: 0,
+      burnRatePeakWindowUtc: null,
+      costPerLineUsd: 0,
     },
     work: {
       filesTouched: fileMap.size,
@@ -196,6 +229,7 @@ export function buildCombinedReceipt(
       bashCommands,
       webFetches,
       userModified,
+      mostEditedFile: null,
     },
     tools: {
       total: Object.values(toolCounts).reduce((s, n) => s + n, 0),
@@ -214,7 +248,21 @@ export function buildCombinedReceipt(
       longestUserMsgChars,
       ...promptStatsOf(promptLengths),
       shortestPromptText,
+      waitThenGoCount,
+      politenessScore: {
+        please: politenessPlease,
+        thanks: politenessThanks,
+        sorry: politenessSorry,
+        total: politenessPlease + politenessThanks + politenessSorry,
+      },
     },
     firstPrompt: fp,
+    archetype: {
+      key: "vibe-coder",
+      taglineKey: "archetype.vibe-coder.tagline",
+      scores: {},
+    },
+    comparison: null,
+    achievements: [],
   };
 }
