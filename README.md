@@ -1,114 +1,228 @@
 # vibe-receipt
 
-> Per-session paper-receipt cards for Claude Code & Codex CLI sessions.
+> A beautiful paper-receipt card for every Claude Code & Codex CLI session.
+> Tokens, cost, files touched, deep-thought time, ESC-rage — all in a screenshot you can actually share.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![status](https://img.shields.io/badge/status-v0.1.0-orange)
+![tested-against](https://img.shields.io/badge/tested-Claude%20Code%20%2B%20Codex%20CLI-blueviolet)
 
-`vibe-receipt` reads your last AI-coding session JSONL and renders a sharable PNG receipt — tokens, cost, files touched, ESC-rage, deep-thought time, subagent breakdowns, and the rest of the personality stats nobody else surfaces. **100% local** — no upload, no telemetry, no auth.
+<p align="center">
+  <img src="docs/images/hero.png" width="540" alt="Single-session receipt example">
+</p>
 
-## Install
+**100% local.** No upload, no telemetry, no auth. Reads your existing session logs and renders a PNG you can drop in a tweet, story, or video.
+
+---
+
+## Quickstart (60 seconds)
+
+You need Node 20+ on your machine. Check with `node --version`.
 
 ```bash
-npx vibe-receipt
-# or
-pnpm dlx vibe-receipt
-# or globally:
-npm install -g vibe-receipt
+# 1. Clone the repo
+git clone https://github.com/loris307/vibe-receipt
+cd vibe-receipt
+
+# 2. Install dependencies
+pnpm install     # or: npm install
+
+# 3. Build it
+pnpm build       # or: npm run build
+
+# 4. Run it on your last Claude Code session
+node dist/cli.mjs
 ```
 
-Requires Node ≥ 20.19.4. macOS / Linux / Windows.
+That's it. You'll see a terminal preview, and a PNG saved to `./vibe-receipts/<session-id>.png`.
 
-## Usage
+> **Want to type just `vibe-receipt` from anywhere?** Run `pnpm link --global` once in the repo. Reverse with `pnpm unlink --global vibe-receipt`.
+
+---
+
+## What you get
+
+After a session, the receipt summarizes:
+
+| Section | Stats |
+|---|---|
+| **SESSION** | duration · model · total tokens · cost (USD) · cache-hit ratio |
+| **WORK** | files touched · lines added/removed · bash commands · web fetches |
+| **TOP TOOLS** | bar chart of your 5 most-used tools (Edit, Bash, Read, Skill, Agent, …) |
+| **SUBAGENTS** | count · total time · total tokens · total tool calls |
+| **PERSONALITY** | afk · ESC-rage · permission flips · YOLO mode · deep thought time · skills · slash commands |
+| **PROMPTING** | total prompts · longest/shortest/avg length · first-prompt preview · shortest prompt full text |
+
+---
+
+## Common commands
 
 ```bash
-# render the most recent session (Claude Code or Codex CLI)
+# Most recent session (Claude Code or Codex CLI — whichever was last)
 vibe-receipt
 
-# specific session
+# Specific session
 vibe-receipt --session 297c7fe2
 
-# combine multiple sessions
-vibe-receipt combine --since 2h
-vibe-receipt combine --branch feature/oss-saint
-vibe-receipt combine --cwd ~/Projects/myrepo
+# Combine: merge multiple sessions into one receipt
+vibe-receipt combine --since 1h          # last hour
+vibe-receipt combine --since 24h         # last day
+vibe-receipt combine --cwd .             # only sessions from this directory
+vibe-receipt combine --branch feature/x  # only sessions on this git branch
 
-# windows
-vibe-receipt today
-vibe-receipt week
-vibe-receipt year
+# Window modes — pre-set time ranges
+vibe-receipt today                       # everything since midnight (local)
+vibe-receipt week                        # last 7 days
+vibe-receipt year                        # current calendar year
 
-# install the SessionEnd hook (toast + lazy gen)
-vibe-receipt install-hook
+# Output formats
+vibe-receipt --size portrait    # default · 1080×1500 · IG-feed-friendly
+vibe-receipt --size story       # 1080×1920 · IG/TikTok story
+vibe-receipt --size og          # 1200×630 · link-unfurl
+vibe-receipt --size all         # writes all three
+
+# JSON instead of PNG
+vibe-receipt --json
+
+# Diagnostics
+vibe-receipt sources    # which JSONL dirs / how many sessions / how big
+vibe-receipt doctor     # health check (fonts, resvg, ccusage all loaded)
+vibe-receipt --help
 ```
 
-## What's on the card
-
-The card is split into four sections:
-
-- **SESSION** — duration, model, tokens, cost (USD), cache-hit ratio
-- **WORK** — files touched, lines added/removed, bash command count, web fetches
-- **TOP TOOLS** — bar chart of the 5 most-used tools (Edit, Bash, Read, Skill, Agent…)
-- **SUBAGENTS** — duration + tokens for every dispatched subagent
-- **PERSONALITY** — afk, esc-rage, permission flips, yolo mode, deep thought time, skills, slash commands
-- **FIRST PROMPT** — word count + mood glyph + content fingerprint (sha:6)
+---
 
 ## Privacy: smart-redact by default
 
-Out of the box, the card is screenshot-safe:
+Receipts are screenshot-safe out of the box. Sensitive fields are redacted unless you explicitly opt in:
 
-| Field | Default | `--reveal` to show |
+| Field | Default behavior | Opt in with |
 |---|---|---|
-| `cwd` | basename only (`myrepo`, not `~/Desktop/clientwork/NDA/myrepo`) | `paths` |
-| Branch | first slash-segment + `…` (`feature/…`) | `paths` |
-| File paths | filename only (`page.tsx`) | `paths` |
-| First prompt | hidden — only word count + mood + sha-fingerprint | `prompt` |
-| AFK recap | `<recap hidden>` | `prompt` |
-| Bash commands | omitted entirely | `bash` |
-
-Use `--reveal=all` to opt out of all redaction. The ANSI terminal preview always renders **before** the PNG is written so you can see what's about to leak.
-
-## Output formats
+| Project path | basename only (`myrepo`, not `~/Desktop/clientwork/NDA/myrepo`) | `--reveal=paths` |
+| Git branch | first slash-segment + `…` (`feature/…`) | `--reveal=paths` |
+| File paths | filename only (`page.tsx` instead of `apps/secret/page.tsx`) | `--reveal=paths` |
+| First prompt | shown as `N words · mood-glyph · sha-fingerprint` only | `--reveal=prompt` |
+| AFK recap text | replaced with `<recap hidden>` | `--reveal=prompt` |
+| Bash commands | omitted entirely | `--reveal=bash` |
 
 ```bash
-vibe-receipt --size portrait          # 1080×1350 (default)
-vibe-receipt --size story             # 1080×1920 (IG/TikTok story)
-vibe-receipt --size og                # 1200×630  (link-unfurl)
-vibe-receipt --size all               # all three at once
-vibe-receipt --json                   # raw Receipt JSON to stdout
+vibe-receipt --reveal=paths,prompt   # show paths and first-prompt content
+vibe-receipt --reveal=all            # show everything
 ```
 
-## Hooks
+The ANSI preview always renders BEFORE the PNG is written so you can see what's about to leak.
 
-`vibe-receipt install-hook` adds a one-line `SessionEnd` hook to `~/.claude/settings.json` that prints a toast (`📸 Receipt ready · vibe-receipt show`) at the end of each Claude Code session. **No PNG is rendered at hook time** — generation is lazy, only when you invoke `vibe-receipt show`. This keeps your disk free of stale PNGs while keeping receipts always one keystroke away.
+---
+
+## Auto-receipt on session end (optional hook)
+
+Want a little 📸 toast every time a Claude Code session ends? Install the hook:
 
 ```bash
-vibe-receipt install-hook    # adds the hook + writes a settings.json.bak
-vibe-receipt hook-status     # check whether it's installed
+vibe-receipt install-hook    # patches ~/.claude/settings.json (with backup)
+vibe-receipt hook-status     # check it's installed
 vibe-receipt uninstall-hook  # remove it
 ```
 
-## Sources
+When a session ends, you'll see:
+```
+📸 Receipt ready · vibe-receipt show
+```
 
-`vibe-receipt` reads JSONL sessions from:
+**The hook does NOT auto-render.** It only writes a one-line index entry. You generate the PNG when you actually want it via `vibe-receipt show` — keeps your disk free of stale PNGs.
 
-- `~/.claude/projects/**/*.jsonl` (Claude Code, also reads `~/.config/claude/projects/`)
-- `~/.codex/sessions/**/*.jsonl` (OpenAI Codex CLI)
+---
 
-Token + cost data for Claude is computed via [`ccusage`](https://github.com/ryoppippi/ccusage)'s LiteLLM-fetched price table, with a hardcoded fallback for fresh Anthropic models. Codex pricing is local-table-only for v1.
+## Combine receipts across sessions
+
+Real-world AI coding rarely fits in one session. You'll spawn parallel worktrees, hop between projects, run subagents. The `combine` command merges them into one card:
+
+<p align="center">
+  <img src="docs/images/combined.png" width="540" alt="Combined receipt across 6 sessions">
+</p>
+
+The combined card shows:
+- `wall window` — earliest start to latest end across all merged sessions
+- `active time` — sum of model-active time (can exceed `wall window` for parallel sessions — by design)
+- All cost / token / file / personality numbers summed across sessions
+
+---
+
+## Where the data comes from
+
+vibe-receipt reads existing JSONL session logs that Claude Code and Codex CLI already write. **Nothing is uploaded; nothing is sent anywhere.**
+
+- **Claude Code:** `~/.claude/projects/<project>/<session-uuid>.jsonl` (also `~/.config/claude/projects/` if XDG)
+- **Codex CLI:** `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`
+- **Subagent transcripts** (under `<session-uuid>/subagents/`) are summed for cost but don't appear as separate sessions
+
+Token + cost computation is sourced from:
+1. [`ccusage`](https://github.com/ryoppippi/ccusage) when its LiteLLM-fetched pricing table has the model
+2. A bundled fallback table (`src/extract/claude-pricing.ts`) for fresh models LiteLLM hasn't picked up yet — currently calibrated against [Anthropic's official pricing page](https://platform.claude.com/docs/en/about-claude/pricing) (verified May 2026)
+
+---
 
 ## Languages
 
-English by default. Optional German variant via `--lang de` (renames the masthead to **VIBE BON**).
+English by default. German variant via `--lang de` (renames the masthead to **VIBE BON**, all section headers translated).
+
+---
+
+## Troubleshooting
+
+**"command not found: vibe-receipt"**
+You haven't installed it globally yet. Either:
+- Run `node /path/to/vibe-receipt/dist/cli.mjs ...` directly, or
+- `cd /path/to/vibe-receipt && pnpm link --global` to make `vibe-receipt` available everywhere.
+
+**"no sessions found"**
+Either you haven't run a Claude Code or Codex session yet on this machine, or you're filtering too tightly. Run `vibe-receipt sources` to see what JSONL files exist.
+
+**"fonts: FAIL — bundled fonts not found"**
+The package didn't ship its fonts. Re-run `pnpm install && pnpm build` from the repo.
+
+**Cost looks too high / too low**
+Anthropic's actual billing may differ slightly from what receipts show, mainly for two reasons:
+- Opus 4.7 ships a new tokenizer that produces ~35% more tokens for the same text. JSONL counts are pre-tokenizer; billing may differ.
+- ccusage's LiteLLM table may not include the very newest model — fallback table is used. Compare against [Anthropic console](https://console.anthropic.com) for ground truth.
+
+**The PNG is clipping at the bottom**
+Should not happen — heights auto-extend based on content. If it does, please file an issue with the `--json` output.
+
+**JSON output has weird `[ccusage] ℹ Loaded pricing` line at top**
+Update — that was fixed in v0.1.x. Run `pnpm build` again.
+
+---
+
+## FAQ
+
+**Does this cost anything to run?**
+No. It only reads files that already exist on your disk. No API calls.
+
+**Do you upload anything?**
+No. Zero outbound network calls in render or extract paths. The only network call is ccusage's pricing-table fetch from LiteLLM (cached); set `VIBE_RECEIPT_OFFLINE=1` to disable even that.
+
+**Can I share my receipt without leaking secrets?**
+Yes — that's the whole point. Default rendering hides paths, prompts, and bash commands. The ANSI preview shows you exactly what the PNG will contain before it's written.
+
+**Does it work with Cursor / Copilot / JetBrains AI?**
+Not yet. Cursor stores its history in SQLite blobs that change format every minor release — too fragile for v1. Copilot doesn't persist local stats at all. Open an issue if you want it.
+
+**Why does `combine --since 1h` sometimes show 5 sessions when I only had 2?**
+Older versions counted subagent transcripts as separate sessions. Fixed in commit `cbaf124` — update.
+
+---
 
 ## Roadmap
 
-- v1.0 — Claude Code + Codex sources · single + combine + window modes · hook · DE/EN
-- v1.1 — schema-drift canary, OG layout fixes, optional AI mood scoring (opt-in)
-- v2.0 — wrapped engine: persistent SQLite history, streaks, achievements, comparisons; Cursor source via wrapped existing parsers
-- v3 — speculative: opt-in cloud share, VS Code surfacing
+- **v1.0** — Claude Code + Codex CLI sources · single + combine + window modes · hook · DE/EN ✓
+- **v1.1** — schema-drift canary, OG (1200×630) layout polish, optional AI-mood scoring (opt-in)
+- **v2.0** — wrapped engine: persistent SQLite history, streaks, achievements, year-in-review comparisons, Cursor support
+- **v3** (speculative) — opt-in cloud share for `vibe-receipt.dev/r/<hash>`, VS Code panel
 
 See [`docs/spec.md`](docs/spec.md) for the full design spec.
+
+---
 
 ## License
 
@@ -116,9 +230,9 @@ MIT — see [LICENSE](LICENSE).
 
 ## Credits
 
-- [`ccusage`](https://github.com/ryoppippi/ccusage) by ryoppippi — Claude Code data loader, MIT.
-- [Satori](https://github.com/vercel/satori) by Vercel — JSX → SVG renderer, MIT.
-- [`@resvg/resvg-js`](https://github.com/yisibl/resvg-js) — SVG → PNG, MPL-2.0.
-- [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) — bundled font, OFL-1.1.
+- [`ccusage`](https://github.com/ryoppippi/ccusage) by [@ryoppippi](https://github.com/ryoppippi) — Claude Code data loader (MIT)
+- [Satori](https://github.com/vercel/satori) by Vercel — JSX → SVG renderer (MIT)
+- [`@resvg/resvg-js`](https://github.com/yisibl/resvg-js) — SVG → PNG (MPL-2.0)
+- [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) — bundled font (OFL-1.1)
 
-Built by [@loris307](https://github.com/loris307).
+Built by [@loris307](https://github.com/loris307) · vibe-coding YouTube channel: [@lorisgaller](https://www.youtube.com/@lorisgaller)
