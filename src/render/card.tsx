@@ -751,7 +751,7 @@ export function VibeCard({ receipt, s, size, height }: CardProps): React.ReactEl
         </div>
       ) : null}
 
-      {/* BADGES — 0..3 emoji-glyph achievements */}
+      {/* BADGES — 0..3 emoji-glyph achievements (skip on og teaser) */}
       {receipt.achievements.length > 0 && size !== "og" ? (
         <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
           <Divider />
@@ -810,7 +810,7 @@ export function VibeCard({ receipt, s, size, height }: CardProps): React.ReactEl
       {/* spacer */}
       <div style={{ display: "flex", flex: 1 }} />
 
-      {/* ARCHETYPE stamp — faux rubber-stamp at the foot of the receipt */}
+      {/* ARCHETYPE stamp — faux rubber-stamp (skip on og teaser) */}
       {size !== "og" ? (
         (() => {
           const ak = receipt.archetype.key;

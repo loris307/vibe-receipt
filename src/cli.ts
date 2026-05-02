@@ -34,7 +34,7 @@ import { handleHookReceive } from "./hook/on-session-end.js";
 import { listSourcesSummary } from "./hook/sources-summary.js";
 import type { Receipt } from "./data/receipt-schema.js";
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 
 interface ParsedArgs {
   command: string;

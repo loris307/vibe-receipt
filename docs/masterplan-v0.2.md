@@ -846,7 +846,7 @@ Medium-High. Layout-Tetris ist fragil. Buffer: nach Phase 8 könnte ein 2nd-iter
 
 ---
 
-## Phase 9 — Tests + Audit + README
+## Phase 9 — Tests + Audit + README ✅ DONE
 
 ### Per-stat unit tests
 

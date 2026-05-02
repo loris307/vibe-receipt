@@ -46,12 +46,27 @@ After a session, the receipt summarizes:
 
 | Section | Stats |
 |---|---|
-| **SESSION** | duration · model · total tokens · cost (USD) · cache-hit ratio |
-| **WORK** | files touched · lines added/removed · bash commands · web fetches |
+| **SESSION** | duration · model · total tokens · cost (USD) · cache-hit ratio · longest solo-stretch · peak burn rate · rate-limit hits · vs last session · vs last 7 days |
+| **WORK** | files touched · lines added/removed · bash commands · web fetches · most-edited single file · $/line shipped |
 | **TOP TOOLS** | bar chart of your 5 most-used tools (Edit, Bash, Read, Skill, Agent, …) |
 | **SUBAGENTS** | count · total time · total tokens · total tool calls |
-| **PERSONALITY** | afk · ESC-rage · permission flips · YOLO mode · deep thought time · skills · slash commands |
+| **PERSONALITY** | afk · ESC-rage · permission flips · YOLO mode · deep thought time · skills · slash commands · wait-then-go · manners (please/thanks/sorry) |
 | **PROMPTING** | total prompts · longest/shortest/avg length · first-prompt preview · shortest prompt full text |
+| **BADGES** | up to 3 rarity-ordered achievements (token-millionaire 🏆, big-spender 💸, marathoner 🏃, auto-pilot 🤝, deep-thinker 🧠, no-error-streak 🔥, sprinter ⚡, toolbox-master 🛠, night-owl 🌙, researcher 📚, bug-hunter 🐛, polite 🙏) |
+| **ARCHETYPE** | one of 8 personas stamped at the foot — The Specifier · The Vibe-Coder · The Fixer · The Researcher · The Firefighter · The Trustfall Pilot · The ESC-Rager · The Night Owl |
+
+### v0.2: persistent history & comparisons
+
+`vibe-receipt` now keeps a local `~/.vibe-receipt/history.jsonl` (one row per render, redacted, idempotent). Inspect or wipe it:
+
+```bash
+vibe-receipt history list
+vibe-receipt history clear
+vibe-receipt history export
+VIBE_RECEIPT_NO_HISTORY=1 vibe-receipt    # opt-out
+```
+
+The receipt's "vs last session" and "week rank" italic lines come from this history file. Combine modes don't appear in history.
 
 ---
 
