@@ -422,17 +422,37 @@ export function VibeCard({ receipt, s, size, height }: CardProps): React.ReactEl
         </div>
       ) : null}
 
-      {receipt.subagents.length > 0 && size !== "og" ? (
-        <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
-          <Divider />
-          <SectionHeader>
-            {`${s.sectionSubagents}  (${receipt.subagents.length})`}
-          </SectionHeader>
-          {receipt.subagents.slice(0, size === "story" ? 6 : 4).map((a, i) => (
-            <SubagentLine key={`${a.type}-${i}`} a={a} />
-          ))}
-        </div>
-      ) : null}
+      {receipt.subagents.length > 0 && size !== "og"
+        ? (() => {
+            const totalDurationMs = receipt.subagents.reduce((s, a) => s + a.durationMs, 0);
+            const totalTokens = receipt.subagents.reduce((s, a) => s + a.totalTokens, 0);
+            const totalTools = receipt.subagents.reduce((s, a) => s + a.toolUseCount, 0);
+            return (
+              <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
+                <Divider />
+                <SectionHeader>{s.sectionSubagents}</SectionHeader>
+                <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
+                  <Row
+                    label={s.labelSubagentCount}
+                    value={String(receipt.subagents.length)}
+                  />
+                  <Row
+                    label={s.labelSubagentTotalTime}
+                    value={formatDurationMs(totalDurationMs)}
+                  />
+                  <Row
+                    label={s.labelSubagentTotalTokens}
+                    value={compactNumber(totalTokens)}
+                  />
+                  <Row
+                    label={s.labelSubagentTotalTools}
+                    value={String(totalTools)}
+                  />
+                </div>
+              </div>
+            );
+          })()
+        : null}
 
       <Divider />
 

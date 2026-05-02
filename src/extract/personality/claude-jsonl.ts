@@ -432,9 +432,9 @@ export async function extractClaudePersonality(
   out.skills = Array.from(skillSet).slice(0, 3);
   out.slashCommands = Array.from(slashSet).slice(0, 3);
 
-  // Subagents: top by duration
+  // Subagents: keep all (renderer shows aggregate stats; cap was for old per-agent list).
   out.subagents.sort((a, b) => b.durationMs - a.durationMs);
-  out.subagents = out.subagents.slice(0, SUBAGENT_LIMIT);
+  void SUBAGENT_LIMIT;
 
   // Limit toolCounts via sorting at the read site (we keep all here for aggregation).
   void TOOL_LIMIT;

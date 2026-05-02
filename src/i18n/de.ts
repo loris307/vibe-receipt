@@ -14,6 +14,10 @@ export const de: Strings = {
   sectionWork: "ARBEIT",
   sectionTools: "TOP TOOLS",
   sectionSubagents: "SUB-AGENTS",
+  labelSubagentCount: "anzahl",
+  labelSubagentTotalTime: "gesamtzeit",
+  labelSubagentTotalTokens: "tokens gesamt",
+  labelSubagentTotalTools: "tool calls",
   sectionPersonality: "CHARAKTER",
   sectionFirstPrompt: "PROMPTING",
 

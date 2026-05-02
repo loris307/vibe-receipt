@@ -12,6 +12,10 @@ export const en = {
   sectionWork: "WORK",
   sectionTools: "TOP TOOLS",
   sectionSubagents: "SUBAGENTS",
+  labelSubagentCount: "count",
+  labelSubagentTotalTime: "total time",
+  labelSubagentTotalTokens: "total tokens",
+  labelSubagentTotalTools: "total tool uses",
   sectionPersonality: "PERSONALITY",
   sectionFirstPrompt: "PROMPTING",
 

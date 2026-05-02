@@ -45,10 +45,9 @@ export function estimateReceiptHeight(r: Receipt, base: SizePreset): number {
     h += 50;
   }
 
-  // SUBAGENTS
+  // SUBAGENTS (aggregate-stats block: 4 fixed rows)
   if (r.subagents.length > 0) {
-    const lines = base === "story" ? 6 : 4;
-    h += 60 + 30 * Math.min(lines, r.subagents.length);
+    h += 60 + 36 * 4;
     h += 50;
   }
 

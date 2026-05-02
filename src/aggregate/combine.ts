@@ -6,7 +6,6 @@ import { computeFirstPromptFingerprint } from "../redact/fingerprint.js";
 import { promptStatsOf } from "./prompt-stats.js";
 
 const TOP_FILES_LIMIT = 5;
-const SUBAGENT_LIMIT = 8;
 const TOOL_LIMIT = 5;
 
 export function buildCombinedReceipt(
@@ -202,7 +201,7 @@ export function buildCombinedReceipt(
       total: Object.values(toolCounts).reduce((s, n) => s + n, 0),
       top: topToolStats(toolCounts, TOOL_LIMIT),
     },
-    subagents: subagents.slice(0, SUBAGENT_LIMIT),
+    subagents,
     personality: {
       escInterrupts,
       permissionFlips,

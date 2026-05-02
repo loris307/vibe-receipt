@@ -110,17 +110,16 @@ export function renderAnsi(receipt: Receipt, s: Strings): string {
     lines.push(divider());
   }
 
-  // SUBAGENTS
+  // SUBAGENTS — aggregate stats only
   if (receipt.subagents.length > 0) {
-    lines.push(sectionHeader(`${s.sectionSubagents}  (${receipt.subagents.length})`));
-    for (const a of receipt.subagents.slice(0, 4)) {
-      lines.push(
-        `  ${chalk.dim("↳")} ${a.type.padEnd(20, " ")}  ${formatDurationMs(a.durationMs)} · ${compactNumber(a.totalTokens)} tok`,
-      );
-    }
-    if (receipt.subagents.length > 4) {
-      lines.push(chalk.dim(`     +${receipt.subagents.length - 4} more`));
-    }
+    const totalDurationMs = receipt.subagents.reduce((s, a) => s + a.durationMs, 0);
+    const totalTokens = receipt.subagents.reduce((s, a) => s + a.totalTokens, 0);
+    const totalTools = receipt.subagents.reduce((s, a) => s + a.toolUseCount, 0);
+    lines.push(sectionHeader(s.sectionSubagents));
+    lines.push(row(s.labelSubagentCount, String(receipt.subagents.length)));
+    lines.push(row(s.labelSubagentTotalTime, formatDurationMs(totalDurationMs)));
+    lines.push(row(s.labelSubagentTotalTokens, compactNumber(totalTokens)));
+    lines.push(row(s.labelSubagentTotalTools, String(totalTools)));
     lines.push(divider());
   }
 
