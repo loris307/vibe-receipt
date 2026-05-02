@@ -6,8 +6,6 @@ export type Lang = "en" | "de";
 
 export function pickLang(explicit?: string | null): Lang {
   if (explicit === "de" || explicit === "en") return explicit;
-  const sys = process.env.LANG ?? "";
-  if (sys.toLowerCase().startsWith("de")) return "de";
   return "en";
 }
 

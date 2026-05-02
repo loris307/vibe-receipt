@@ -99,7 +99,7 @@ Token + cost data for Claude is computed via [`ccusage`](https://github.com/ryop
 
 ## Languages
 
-`--lang en` (default) or `--lang de`. Auto-detects German via `$LANG`. The DE variant renames the masthead to **VIBE BON** because that's the funny one.
+English by default. Optional German variant via `--lang de` (renames the masthead to **VIBE BON**).
 
 ## Roadmap
 
