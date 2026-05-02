@@ -160,6 +160,13 @@ export const loadCodexSessions: SourceLoader = async (opts) => {
       rateLimitHits: p.rateLimitHits,
       rateLimitWaitMs: p.rateLimitWaitMs,
       tokenEvents: p.tokenEvents,
+
+      compactionCount: p.compactionCount,
+      firstCompactPreTokens: p.firstCompactPreTokens,
+      firstCompactContextPct: p.firstCompactContextPct,
+      mcpServers: p.mcpServers,
+      sidechainEvents: p.sidechainEvents,
+      correctionCount: p.correctionCount,
     };
     if (!passesFilters(ns, opts)) continue;
     out.push(ns);
@@ -235,5 +242,12 @@ export async function loadCodexFromFile(filePath: string): Promise<NormalizedSes
     rateLimitHits: p.rateLimitHits,
     rateLimitWaitMs: p.rateLimitWaitMs,
     tokenEvents: p.tokenEvents,
+
+    compactionCount: p.compactionCount,
+    firstCompactPreTokens: p.firstCompactPreTokens,
+    firstCompactContextPct: p.firstCompactContextPct,
+    mcpServers: p.mcpServers,
+    sidechainEvents: p.sidechainEvents,
+    correctionCount: p.correctionCount,
   };
 }

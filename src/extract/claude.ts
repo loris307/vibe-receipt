@@ -125,6 +125,14 @@ function personalityToNormalized(p: Awaited<ReturnType<typeof extractClaudePerso
     rateLimitHits: p.rateLimitHits,
     rateLimitWaitMs: p.rateLimitWaitMs,
     tokenEvents: p.tokenEvents,
+
+    // v0.3
+    compactionCount: p.compactionCount,
+    firstCompactPreTokens: p.firstCompactPreTokens,
+    firstCompactContextPct: p.firstCompactContextPct,
+    mcpServers: p.mcpServers,
+    sidechainEvents: p.sidechainEvents,
+    correctionCount: p.correctionCount,
   };
 }
 

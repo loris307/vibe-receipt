@@ -55,6 +55,19 @@ After a session, the receipt summarizes:
 | **BADGES** | up to 3 rarity-ordered achievements (token-millionaire 🏆, big-spender 💸, marathoner 🏃, auto-pilot 🤝, deep-thinker 🧠, no-error-streak 🔥, sprinter ⚡, toolbox-master 🛠, night-owl 🌙, researcher 📚, bug-hunter 🐛, polite 🙏) |
 | **ARCHETYPE** | one of 8 personas stamped at the foot — The Specifier · The Vibe-Coder · The Fixer · The Researcher · The Firefighter · The Trustfall Pilot · The ESC-Rager · The Night Owl |
 
+### v0.3: deeper session signals
+
+Four new stats land on the card when the data is there (silently skipped otherwise):
+
+| Stat | Where | What it shows |
+|---|---|---|
+| **compactions × N · first @ X% ctx** | SESSION | Times you hit `/compact`, plus the context-window percentage at the first squeeze |
+| **MCP servers** | dedicated MCP section (≥2 servers) or single-row line (1 server) | Which MCP servers you used and which got hammered most |
+| **side branches: N×** | TOP TOOLS fine-print | Count of `isSidechain:true` events (raw signal — useful when subagents/`/btw` are active) |
+| **corrections × N · X% of prompts** | PERSONALITY | Approximate self-corrections in your prompts ("Nein, ich meinte…", "no, use X instead") — EN + DE patterns |
+
+OG (1200×630) stays minimal-by-design and skips the v0.3 rows; portrait + story auto-extend to fit.
+
 ### v0.2: persistent history & comparisons
 
 `vibe-receipt` now keeps a local `~/.vibe-receipt/history.jsonl` (one row per render, redacted, idempotent). Inspect or wipe it:
@@ -231,6 +244,8 @@ Older versions counted subagent transcripts as separate sessions. Fixed in commi
 ## Roadmap
 
 - **v1.0** — Claude Code + Codex CLI sources · single + combine + window modes · hook · DE/EN ✓
+- **v0.2** — history store, comparisons, archetypes, achievements ✓
+- **v0.3** — compactions, MCP servers, sidechain count, correction patterns ✓
 - **v1.1** — schema-drift canary, OG (1200×630) layout polish, optional AI-mood scoring (opt-in)
 - **v2.0** — wrapped engine: persistent SQLite history, streaks, achievements, year-in-review comparisons, Cursor support
 - **v3** (speculative) — opt-in cloud share for `vibe-receipt.dev/r/<hash>`, VS Code panel

@@ -1,4 +1,10 @@
-import type { Source, Subagent, ToolStat, TopFile } from "./receipt-schema.js";
+import type {
+  McpServerStat,
+  Source,
+  Subagent,
+  ToolStat,
+  TopFile,
+} from "./receipt-schema.js";
 
 export type { Source } from "./receipt-schema.js";
 
@@ -78,6 +84,20 @@ export interface NormalizedSession {
   /** Stream of (timestamp_ms, tokens) pairs for burn-rate peak computation.
    *  tokens = input + output + cacheCreate per assistant message. */
   tokenEvents: { ts: number; tokens: number }[];
+
+  // v0.3 fields — defaulted by extractors that don't compute them
+  /** Count of system.compact_boundary events (dedup by uuid when present). */
+  compactionCount: number;
+  /** preTokens of the chronologically-first compaction; null if no compaction. */
+  firstCompactPreTokens: number | null;
+  /** preTokens / contextWindow(model), clamped 0..1; null if no compaction or no model. */
+  firstCompactContextPct: number | null;
+  /** MCP servers used in this session, sorted desc by callCount, capped at 5. */
+  mcpServers: McpServerStat[];
+  /** Count of JSONL events with isSidechain:true (dedup by uuid when present). */
+  sidechainEvents: number;
+  /** Count of user prompts matching correction patterns ("nein/no/actually/i meant"). */
+  correctionCount: number;
 
   inFlight?: boolean;
   warnings?: string[];

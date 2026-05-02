@@ -42,6 +42,9 @@ export function buildSingleReceipt(ns: NormalizedSession): Receipt {
       longestSoloStretchMs: ns.longestSoloStretchMs,
       longestSoloStretchStartUtc: ns.longestSoloStretchStartUtc,
       longestSoloStretchEndUtc: ns.longestSoloStretchEndUtc,
+      compactionCount: ns.compactionCount,
+      firstCompactPreTokens: ns.firstCompactPreTokens,
+      firstCompactContextPct: ns.firstCompactContextPct,
     },
 
     cost: {
@@ -73,6 +76,8 @@ export function buildSingleReceipt(ns: NormalizedSession): Receipt {
     tools: {
       total: Object.values(ns.toolCounts).reduce((s, n) => s + n, 0),
       top: topToolStats(ns.toolCounts, 5),
+      mcpServers: ns.mcpServers,
+      sidechainEvents: ns.sidechainEvents,
     },
 
     subagents: ns.subagents,
@@ -96,6 +101,11 @@ export function buildSingleReceipt(ns: NormalizedSession): Receipt {
         sorry: ns.politenessSorry,
         total: ns.politenessPlease + ns.politenessThanks + ns.politenessSorry,
       },
+      correctionCount: ns.correctionCount,
+      correctionRate:
+        ns.promptLengths.length > 0
+          ? ns.correctionCount / ns.promptLengths.length
+          : 0,
     },
 
     firstPrompt: fp,

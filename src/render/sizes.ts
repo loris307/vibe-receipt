@@ -35,6 +35,7 @@ export function estimateReceiptHeight(r: Receipt, base: SizePreset): number {
   if (r.time.longestSoloStretchMs > 60_000) h += 36;
   if (r.cost.burnRatePeakTokensPerMin > 0) h += 36;
   if (r.cost.rateLimitHits > 0) h += 36;
+  if (r.time.compactionCount > 0) h += 36; // v0.3 compactions row
   if (r.comparison?.vsLastSession) h += 30;
   if (r.comparison?.vsLast7Days) h += 30;
   h += 50; // divider
@@ -50,7 +51,15 @@ export function estimateReceiptHeight(r: Receipt, base: SizePreset): number {
   // TOP TOOLS
   if (r.tools.top.length > 0) {
     h += 60 + 30 * Math.min(5, r.tools.top.length);
+    if (r.tools.sidechainEvents > 0) h += 30; // v0.3 side-branches fine-print
     h += 50;
+  }
+  // v0.3 — MCP section (only when ≥2 servers; 1-server is a fine-print row only)
+  if (r.tools.mcpServers.length >= 2) {
+    h += 60 + 36 + 36 * Math.min(5, r.tools.mcpServers.length);
+    h += 50;
+  } else if (r.tools.mcpServers.length === 1) {
+    h += 36;
   }
 
   // SUBAGENTS (aggregate-stats block: 4 fixed rows)
@@ -69,6 +78,7 @@ export function estimateReceiptHeight(r: Receipt, base: SizePreset): number {
   if (r.personality.slashCommands.length > 0) pRows++;
   if (r.personality.waitThenGoCount > 0) pRows++;
   if (r.personality.politenessScore.total > 0) pRows++;
+  if (r.personality.correctionCount > 0) pRows++; // v0.3 corrections row
   h += 60 + 36 * pRows;
   h += 50;
 

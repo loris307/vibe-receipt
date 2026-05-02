@@ -1,5 +1,11 @@
 import { basename } from "node:path";
-import type { Receipt, ReceiptScope, Subagent, TopFile } from "../data/receipt-schema.js";
+import type {
+  McpServerStat,
+  Receipt,
+  ReceiptScope,
+  Subagent,
+  TopFile,
+} from "../data/receipt-schema.js";
 import type { NormalizedSession, Source } from "../data/types.js";
 import { topToolStats } from "../data/types.js";
 import { computeFirstPromptFingerprint } from "../redact/fingerprint.js";
@@ -73,6 +79,17 @@ export function buildCombinedReceipt(
   let rateLimitHits = 0;
   let rateLimitWaitMs = 0;
   const allTokenEvents: TokenEvent[] = [];
+  // v0.3
+  let compactionCount = 0;
+  /** Earliest session that contributed a compaction (by session.startUtc).
+   *  We copy its already-clamped pct rather than recomputing — model context is per-session. */
+  let firstCompactCarrier: { startUtcMs: number; ns: NormalizedSession } | null = null;
+  let sidechainEvents = 0;
+  let correctionCount = 0;
+  const mcpAccumulator = new Map<
+    string,
+    { callCount: number; tools: Set<string> }
+  >();
   const skillSet = new Set<string>();
   const slashSet = new Set<string>();
   const modelSet = new Set<string>();
@@ -144,6 +161,36 @@ export function buildCombinedReceipt(
     rateLimitHits += s.rateLimitHits;
     rateLimitWaitMs += s.rateLimitWaitMs;
     for (const ev of s.tokenEvents) allTokenEvents.push(ev);
+
+    // v0.3 merges
+    compactionCount += s.compactionCount;
+    sidechainEvents += s.sidechainEvents;
+    correctionCount += s.correctionCount;
+    if (s.firstCompactPreTokens !== null) {
+      const ts = Number.isFinite(start) ? start : 0;
+      if (firstCompactCarrier === null || ts < firstCompactCarrier.startUtcMs) {
+        firstCompactCarrier = { startUtcMs: ts, ns: s };
+      }
+    }
+    for (const m of s.mcpServers) {
+      const cur = mcpAccumulator.get(m.name);
+      if (cur) {
+        cur.callCount += m.callCount;
+        // toolCount sum is a weak approximation across sessions (tool sets may overlap).
+        // Best-effort: keep a synthetic union by repeating server name with N tool slots —
+        // we can't recover tool names here, so we sum and accept overcounting risk.
+        // For a tight count, the extractor would need to expose tool names per server.
+        // Acceptable for v0.3; revisit if combine-mode MCP becomes prominent.
+        for (let i = 0; i < m.toolCount; i++) {
+          cur.tools.add(`${m.name}#${cur.tools.size}`);
+        }
+      } else {
+        const tools = new Set<string>();
+        for (let i = 0; i < m.toolCount; i++) tools.add(`${m.name}#${i}`);
+        mcpAccumulator.set(m.name, { callCount: m.callCount, tools });
+      }
+    }
+
     if (s.longestSoloStretchMs > longestSoloStretchMs) {
       longestSoloStretchMs = s.longestSoloStretchMs;
       longestSoloStretchStartUtc = s.longestSoloStretchStartUtc;
@@ -181,6 +228,12 @@ export function buildCombinedReceipt(
   if (!Number.isFinite(minStart)) minStart = 0;
 
   const wallDurationMs = Math.max(0, maxEnd - minStart);
+
+  // v0.3 — MCP servers: re-sort + cap 5
+  const mergedMcpServers: McpServerStat[] = Array.from(mcpAccumulator.entries())
+    .map(([name, e]) => ({ name, callCount: e.callCount, toolCount: e.tools.size }))
+    .sort((a, b) => b.callCount - a.callCount)
+    .slice(0, 5);
 
   const branchTop =
     branchCounts.size > 0
@@ -222,6 +275,9 @@ export function buildCombinedReceipt(
       longestSoloStretchMs,
       longestSoloStretchStartUtc,
       longestSoloStretchEndUtc,
+      compactionCount,
+      firstCompactPreTokens: firstCompactCarrier?.ns.firstCompactPreTokens ?? null,
+      firstCompactContextPct: firstCompactCarrier?.ns.firstCompactContextPct ?? null,
     },
     cost: {
       totalUsd,
@@ -254,6 +310,8 @@ export function buildCombinedReceipt(
     tools: {
       total: Object.values(toolCounts).reduce((s, n) => s + n, 0),
       top: topToolStats(toolCounts, TOOL_LIMIT),
+      mcpServers: mergedMcpServers,
+      sidechainEvents,
     },
     subagents,
     personality: {
@@ -275,6 +333,10 @@ export function buildCombinedReceipt(
         sorry: politenessSorry,
         total: politenessPlease + politenessThanks + politenessSorry,
       },
+      correctionCount,
+      // re-derive from summed counts — never average per-session rates
+      correctionRate:
+        promptLengths.length > 0 ? correctionCount / promptLengths.length : 0,
     },
     firstPrompt: fp,
     archetype: {

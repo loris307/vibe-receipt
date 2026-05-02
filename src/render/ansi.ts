@@ -91,6 +91,16 @@ export function renderAnsi(receipt: Receipt, s: Strings): string {
         `× ${receipt.cost.rateLimitHits} · ${formatDurationMs(receipt.cost.rateLimitWaitMs)}`,
       ),
     );
+  if (receipt.time.compactionCount > 0) {
+    const v =
+      receipt.time.firstCompactContextPct !== null
+        ? `× ${receipt.time.compactionCount} · ${s.labelFirstCompactCtx.replace(
+            "{pct}",
+            String(Math.round(receipt.time.firstCompactContextPct * 100)),
+          )}`
+        : `× ${receipt.time.compactionCount}`;
+    lines.push(row(s.labelCompactions, v));
+  }
   if (receipt.comparison?.vsLastSession) {
     const c = receipt.comparison.vsLastSession;
     const tokenSign = c.deltaTokensPct >= 0 ? "+" : "";
@@ -147,7 +157,32 @@ export function renderAnsi(receipt: Receipt, s: Strings): string {
       const bar = gradientText("█".repeat(Math.max(1, barLen)));
       lines.push(`  ${chalk.bold(t.name.padEnd(8, " "))} ${bar}  ${chalk.bold(t.count + "×")}`);
     }
+    if (receipt.tools.sidechainEvents > 0) {
+      lines.push(
+        chalk.italic(chalk.dim(`  ${s.labelSideBranches}: ${receipt.tools.sidechainEvents}×`)),
+      );
+    }
     lines.push(divider());
+  }
+
+  // MCP — only show if any servers used
+  if (receipt.tools.mcpServers.length >= 2) {
+    lines.push(sectionHeader(s.sectionMcp));
+    lines.push(row(s.labelMcpServers, String(receipt.tools.mcpServers.length)));
+    for (const m of receipt.tools.mcpServers.slice(0, 5)) {
+      lines.push(
+        row(m.name, `${m.callCount}× · ${m.toolCount} tool${m.toolCount === 1 ? "" : "s"}`),
+      );
+    }
+    lines.push(divider());
+  } else if (receipt.tools.mcpServers.length === 1) {
+    const top = receipt.tools.mcpServers[0]!;
+    lines.push(
+      row(
+        s.labelMcpServers,
+        s.labelMcpTopServer.replace("{name}", top.name).replace("{count}", String(top.callCount)),
+      ),
+    );
   }
 
   // SUBAGENTS — aggregate stats only
@@ -184,6 +219,15 @@ export function renderAnsi(receipt: Receipt, s: Strings): string {
       row(
         s.labelManners,
         `${ps.please}× please · ${ps.thanks}× thanks${ps.sorry > 0 ? ` · ${ps.sorry}× sorry` : ""}`,
+      ),
+    );
+  }
+  if (receipt.personality.correctionCount > 0) {
+    const pct = Math.round(receipt.personality.correctionRate * 100);
+    lines.push(
+      row(
+        s.labelCorrections,
+        `× ${receipt.personality.correctionCount} · ${s.labelCorrectionRate.replace("{pct}", String(pct))}`,
       ),
     );
   }

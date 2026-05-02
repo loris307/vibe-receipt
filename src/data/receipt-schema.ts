@@ -36,6 +36,13 @@ export const TopFileSchema = v.object({
 });
 export type TopFile = v.InferOutput<typeof TopFileSchema>;
 
+export const McpServerStatSchema = v.object({
+  name: v.string(),
+  callCount: v.number(),
+  toolCount: v.number(),
+});
+export type McpServerStat = v.InferOutput<typeof McpServerStatSchema>;
+
 export const ArchetypeKeySchema = v.union([
   v.literal("specifier"),
   v.literal("vibe-coder"),
@@ -124,6 +131,10 @@ export const ReceiptSchema = v.object({
     longestSoloStretchMs: v.number(),
     longestSoloStretchStartUtc: v.nullable(v.string()),
     longestSoloStretchEndUtc: v.nullable(v.string()),
+    // v0.3 — session-state events
+    compactionCount: v.number(),
+    firstCompactPreTokens: v.nullable(v.number()),
+    firstCompactContextPct: v.nullable(v.number()),
   }),
 
   cost: v.object({
@@ -155,6 +166,10 @@ export const ReceiptSchema = v.object({
   tools: v.object({
     total: v.number(),
     top: v.array(ToolStatSchema),
+    // v0.3 — MCP server inventory; sorted desc by callCount, capped at 5
+    mcpServers: v.array(McpServerStatSchema),
+    // v0.3 — count of events with isSidechain:true (raw signal; semantics TBD)
+    sidechainEvents: v.number(),
   }),
 
   subagents: v.array(SubagentSchema),
@@ -176,6 +191,9 @@ export const ReceiptSchema = v.object({
     shortestPromptText: v.nullable(v.string()),
     waitThenGoCount: v.number(),
     politenessScore: PolitenessSchema,
+    // v0.3 — self/Claude-correction prompts ("nein, ich meinte X"); rate is count / max(1, promptCount)
+    correctionCount: v.number(),
+    correctionRate: v.number(),
   }),
 
   firstPrompt: v.object({

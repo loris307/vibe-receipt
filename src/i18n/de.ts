@@ -72,6 +72,16 @@ export const de: Strings = {
   labelRankWeek: "wochen-rang",
   labelLongestThisWeek: "🏆 längste der letzten 7 tage",
 
+  // v0.3 — neue stat-labels
+  labelCompactions: "verdichtungen",
+  labelFirstCompactCtx: "erste bei {pct}% ktx",
+  sectionMcp: "MCP",
+  labelMcpServers: "MCP-server",
+  labelMcpTopServer: "top: {name} ({count}×)",
+  labelSideBranches: "seitenstränge",
+  labelCorrections: "korrekturen",
+  labelCorrectionRate: "{pct}% der prompts",
+
   sectionBadges: "BADGES",
   sectionArchetype: "ARCHETYP",
 

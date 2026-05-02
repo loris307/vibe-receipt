@@ -1,6 +1,7 @@
 import { readJsonlAll } from "../../util/jsonl.js";
 import type { Subagent, TopFile } from "../../data/receipt-schema.js";
 import { scorePoliteness } from "../politeness.js";
+import { countCorrections } from "../corrections.js";
 
 /**
  * Codex CLI JSONL → personality bundle.
@@ -48,6 +49,14 @@ export interface CodexPersonality {
   rateLimitHits: number;
   rateLimitWaitMs: number;
   tokenEvents: { ts: number; tokens: number }[];
+
+  // v0.3 fields — Codex doesn't expose compaction/MCP/sidechain; corrections via shared regex
+  compactionCount: number;
+  firstCompactPreTokens: number | null;
+  firstCompactContextPct: number | null;
+  mcpServers: import("../../data/receipt-schema.js").McpServerStat[];
+  sidechainEvents: number;
+  correctionCount: number;
 }
 
 const TOP_FILES_LIMIT = 5;
@@ -141,6 +150,14 @@ export async function extractCodexPersonality(
     rateLimitHits: 0,
     rateLimitWaitMs: 0,
     tokenEvents: [],
+
+    // v0.3 defaults (Codex: compaction/MCP/sidechain stay 0/null/[]; corrections in Phase 5)
+    compactionCount: 0,
+    firstCompactPreTokens: null,
+    firstCompactContextPct: null,
+    mcpServers: [],
+    sidechainEvents: 0,
+    correctionCount: 0,
   };
 
   if (events.length === 0) return out;
@@ -292,6 +309,9 @@ export async function extractCodexPersonality(
     out.politenessThanks = pol.thanks;
     out.politenessSorry = pol.sorry;
   }
+
+  // v0.3 — correction count
+  out.correctionCount = countCorrections(out.promptTexts);
 
   // v0.2 — longest solo-stretch
   if (out.promptTimestamps.length >= 2) {

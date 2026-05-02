@@ -522,6 +522,19 @@ export function VibeCard({ receipt, s, size, height }: CardProps): React.ReactEl
             value={`× ${receipt.cost.rateLimitHits} · ${formatDurationMs(receipt.cost.rateLimitWaitMs)}`}
           />
         ) : null}
+        {receipt.time.compactionCount > 0 && !isCompact ? (
+          <Row
+            label={s.labelCompactions}
+            value={
+              receipt.time.firstCompactContextPct !== null
+                ? `× ${receipt.time.compactionCount} · ${s.labelFirstCompactCtx.replace(
+                    "{pct}",
+                    String(Math.round(receipt.time.firstCompactContextPct * 100)),
+                  )}`
+                : `× ${receipt.time.compactionCount}`
+            }
+          />
+        ) : null}
         {receipt.comparison?.vsLastSession ? (
           <ComparisonLine
             label={s.labelVsLast}
@@ -575,6 +588,46 @@ export function VibeCard({ receipt, s, size, height }: CardProps): React.ReactEl
               return <ToolBar key={t.name} tool={t} max={max} />;
             })}
           </div>
+          {receipt.tools.sidechainEvents > 0 && !isCompact ? (
+            <div
+              style={{
+                display: "flex",
+                fontSize: 18,
+                opacity: 0.55,
+                fontStyle: "italic",
+                marginTop: 6,
+              }}
+            >
+              {`${s.labelSideBranches}: ${receipt.tools.sidechainEvents}×`}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {receipt.tools.mcpServers.length >= 2 && size !== "og" ? (
+        <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
+          <Divider />
+          <SectionHeader>{s.sectionMcp}</SectionHeader>
+          <Row
+            label={s.labelMcpServers}
+            value={String(receipt.tools.mcpServers.length)}
+          />
+          {receipt.tools.mcpServers.slice(0, 5).map((m) => (
+            <Row
+              key={m.name}
+              label={m.name}
+              value={`${m.callCount}× · ${m.toolCount} tool${m.toolCount === 1 ? "" : "s"}`}
+            />
+          ))}
+        </div>
+      ) : receipt.tools.mcpServers.length === 1 && size !== "og" ? (
+        <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
+          <Row
+            label={s.labelMcpServers}
+            value={s.labelMcpTopServer
+              .replace("{name}", receipt.tools.mcpServers[0]!.name)
+              .replace("{count}", String(receipt.tools.mcpServers[0]!.callCount))}
+          />
         </div>
       ) : null}
 
@@ -644,6 +697,15 @@ export function VibeCard({ receipt, s, size, height }: CardProps): React.ReactEl
                 ? ` · ${receipt.personality.politenessScore.sorry}× sorry`
                 : ""
             }`}
+          />
+        ) : null}
+        {receipt.personality.correctionCount > 0 && !isCompact ? (
+          <Row
+            label={s.labelCorrections}
+            value={`× ${receipt.personality.correctionCount} · ${s.labelCorrectionRate.replace(
+              "{pct}",
+              String(Math.round(receipt.personality.correctionRate * 100)),
+            )}`}
           />
         ) : null}
       </div>

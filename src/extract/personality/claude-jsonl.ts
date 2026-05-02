@@ -1,6 +1,8 @@
 import { readJsonlAll } from "../../util/jsonl.js";
 import type { Subagent, TopFile } from "../../data/receipt-schema.js";
 import { scorePoliteness } from "../politeness.js";
+import { getContextWindow } from "../claude-context-windows.js";
+import { countCorrections } from "../corrections.js";
 
 /**
  * Personality fields extracted from a Claude Code JSONL file.
@@ -58,6 +60,14 @@ export interface ClaudePersonality {
   rateLimitHits: number;
   rateLimitWaitMs: number;
   tokenEvents: { ts: number; tokens: number }[];
+
+  // v0.3 fields
+  compactionCount: number;
+  firstCompactPreTokens: number | null;
+  firstCompactContextPct: number | null;
+  mcpServers: import("../../data/receipt-schema.js").McpServerStat[];
+  sidechainEvents: number;
+  correctionCount: number;
 
   // (stable across the session in practice; may have multiple values across compactions)
   claudeCodeVersion: string | null;
@@ -234,6 +244,14 @@ export async function extractClaudePersonality(
     rateLimitWaitMs: 0,
     tokenEvents: [],
 
+    // v0.3 defaults — populated by Phase 2-5 logic below
+    compactionCount: 0,
+    firstCompactPreTokens: null,
+    firstCompactContextPct: null,
+    mcpServers: [],
+    sidechainEvents: 0,
+    correctionCount: 0,
+
     claudeCodeVersion: null,
   };
 
@@ -249,6 +267,21 @@ export async function extractClaudePersonality(
   const slashSet = new Set<string>();
   const modelSet = new Set<string>();
   const branches = new Map<string, number>();
+
+  // v0.3 — compaction tracking
+  const compactionUuids = new Set<string>();
+  /** Model active at the moment of the first observed compaction; needed to compute
+   *  context-pct denominator. Updated on every assistant event we see. */
+  let lastSeenAssistantModel: string | null = null;
+  let firstCompactModel: string | null = null;
+  // v0.3 — sidechain tracking
+  const sidechainUuids = new Set<string>();
+  // v0.3 — MCP server tracking
+  // Server names may contain underscores ("my_server"); the FIRST `__` after the
+  // `mcp__` prefix is the unambiguous server/tool separator.
+  const MCP_NAME_PATTERN = /^mcp__(.+?)__(.+)$/;
+  const mcpAccumulator: Map<string, { callCount: number; tools: Set<string> }> =
+    new Map();
 
   // Track thinking turns: index of assistant events with thinking blocks → timestamp
   // We compute thinking duration as `nextEvent.timestamp - thisEvent.timestamp` (capped).
@@ -277,6 +310,17 @@ export async function extractClaudePersonality(
       }
     }
 
+    // v0.3 — sidechain counter (raw signal; semantics: "side branches" / "Seitenstränge")
+    if (evt.isSidechain === true) {
+      const sUuid = typeof evt.uuid === "string" ? evt.uuid : null;
+      if (sUuid) {
+        sidechainUuids.add(sUuid);
+      } else {
+        // No uuid → bump count directly via a synthetic key (avoids size-skew)
+        sidechainUuids.add(`__no-uuid-${sidechainUuids.size}`);
+      }
+    }
+
     const type = evt.type;
 
     if (type === "system") {
@@ -290,6 +334,20 @@ export async function extractClaudePersonality(
         if (Array.isArray(errs)) out.hookErrors += errs.length;
       } else if (sub === "compact_boundary") {
         assistantInFlight = false;
+        // v0.3 — count compaction; capture preTokens + active model on the first one.
+        // Dedup by uuid when present (matches seenToolUseIds pattern); count regardless
+        // when uuid absent so malformed events don't silently undercount.
+        const uuid = typeof evt.uuid === "string" ? evt.uuid : null;
+        const counted = uuid && compactionUuids.has(uuid) ? false : true;
+        if (counted) {
+          if (uuid) compactionUuids.add(uuid);
+          out.compactionCount += 1;
+          const pre = evt.compactMetadata?.preTokens;
+          if (out.firstCompactPreTokens === null && typeof pre === "number") {
+            out.firstCompactPreTokens = pre;
+            firstCompactModel = lastSeenAssistantModel;
+          }
+        }
       } else if (sub === "api_error") {
         // Rate-limit detection. Robust path: HTTP status 429 (Anthropic rate limit).
         // Fallback path: deeply-nested error.error.error.type === "rate_limit_error".
@@ -429,7 +487,11 @@ export async function extractClaudePersonality(
     if (type === "assistant") {
       const msg = evt.message;
       if (!msg || typeof msg !== "object") continue;
-      if (typeof msg.model === "string") modelSet.add(msg.model);
+      if (typeof msg.model === "string") {
+        modelSet.add(msg.model);
+        // v0.3 — keep most-recent assistant model so compact_boundary can capture it
+        lastSeenAssistantModel = msg.model;
+      }
 
       // v0.2 — wait-then-go: track whether assistant intends to continue.
       // stop_reason "end_turn" → finished, "tool_use" / "max_tokens" / "stop_sequence" → mid-stream.
@@ -460,6 +522,25 @@ export async function extractClaudePersonality(
           else if (name === "WebFetch") out.webFetches += 1;
           else if (name === "Skill" && typeof block.input?.skill === "string") {
             skillSet.add(block.input.skill);
+          }
+          // v0.3 — MCP namespace: parse `mcp__<server>__<tool>` and accumulate.
+          // MCP calls also count in toolCounts/tools.total — intentional dual view.
+          {
+            const m = MCP_NAME_PATTERN.exec(name);
+            if (m) {
+              const server = m[1]!;
+              const tool = m[2]!;
+              const entry = mcpAccumulator.get(server);
+              if (entry) {
+                entry.callCount += 1;
+                entry.tools.add(tool);
+              } else {
+                mcpAccumulator.set(server, {
+                  callCount: 1,
+                  tools: new Set([tool]),
+                });
+              }
+            }
           }
         }
       }
@@ -557,6 +638,9 @@ export async function extractClaudePersonality(
     out.politenessSorry = pol.sorry;
   }
 
+  // v0.3 — correction count across all real user prompts
+  out.correctionCount = countCorrections(out.promptTexts);
+
   // v0.2 — longest solo-stretch: max gap between two consecutive REAL user prompts.
   // (one prompt → 0; no prompts → 0.)
   if (out.promptTimestamps.length >= 2) {
@@ -579,6 +663,27 @@ export async function extractClaudePersonality(
     if (maxStart !== null) out.longestSoloStretchStartUtc = new Date(maxStart).toISOString();
     if (maxEnd !== null) out.longestSoloStretchEndUtc = new Date(maxEnd).toISOString();
   }
+
+  // v0.3 — context-% at first compact (clamped 0..1)
+  if (out.firstCompactPreTokens !== null) {
+    const ctxModel = firstCompactModel ?? out.models[0] ?? "";
+    const window = getContextWindow(ctxModel);
+    if (window > 0) {
+      out.firstCompactContextPct = Math.min(
+        1,
+        Math.max(0, out.firstCompactPreTokens / window),
+      );
+    }
+  }
+
+  // v0.3 — finalize sidechain count (set during event loop)
+  out.sidechainEvents = sidechainUuids.size;
+
+  // v0.3 — finalize MCP servers: sort desc by callCount, cap top 5
+  out.mcpServers = Array.from(mcpAccumulator.entries())
+    .map(([name, e]) => ({ name, callCount: e.callCount, toolCount: e.tools.size }))
+    .sort((a, b) => b.callCount - a.callCount)
+    .slice(0, 5);
 
   return out;
 }
