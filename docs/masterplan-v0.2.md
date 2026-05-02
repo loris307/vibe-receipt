@@ -401,7 +401,7 @@ Iteriere events chronologisch. Track `inFlight = false`.
 
 ---
 
-## Phase 4 — History store (new infra)
+## Phase 4 — History store (new infra) ✅ DONE
 
 > **Critical Path** — alle nachfolgenden Comparison-Stats hängen daran.
 

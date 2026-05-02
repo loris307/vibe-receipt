@@ -20,6 +20,8 @@ import { buildCombinedReceipt } from "./aggregate/combine.js";
 import { buildTodayReceipt, buildWeekReceipt, buildYearReceipt } from "./aggregate/window.js";
 import { pickMostRecent } from "./aggregate/pick-most-recent.js";
 import { applyRedaction, parseRevealFlag, withRawPrompt } from "./redact/smart-redact.js";
+import { NO_REVEAL } from "./data/types.js";
+import { recordSession } from "./history/record.js";
 import { renderPng } from "./render/png.js";
 import { renderAnsi } from "./render/ansi.js";
 import { parseSizeFlag, type SizePreset } from "./render/sizes.js";
@@ -152,6 +154,15 @@ async function emit(opts: {
 
   let receipt = opts.receipt;
   if (rawFirstPrompt) receipt = withRawPrompt(receipt, rawFirstPrompt);
+
+  // Record session history in ALWAYS-redacted form (privacy-safe regardless
+  // of user's --reveal choices). Best-effort, never blocks render.
+  try {
+    recordSession(applyRedaction(receipt, NO_REVEAL));
+  } catch {
+    // ignore
+  }
+
   receipt = applyRedaction(receipt, reveal);
 
   if (wantJson) {
@@ -335,6 +346,44 @@ async function cmdDoctor(): Promise<number> {
   return 0;
 }
 
+async function cmdHistory(parsed: ParsedArgs): Promise<number> {
+  const { readHistory, clearHistory, HISTORY_PATH } = await import("./history/store.js");
+  const sub = parsed.positional[0] ?? "list";
+  if (sub === "list") {
+    const limit = typeof parsed.flags.limit === "string" ? Math.max(1, parseInt(parsed.flags.limit, 10)) : 20;
+    const all = readHistory().sort((a, b) => b.recordedAt.localeCompare(a.recordedAt));
+    if (all.length === 0) {
+      process.stderr.write("no history yet — render a receipt first\n");
+      return 0;
+    }
+    process.stdout.write(`history: ${all.length} entries · ${HISTORY_PATH}\n\n`);
+    process.stdout.write(
+      ["recorded", "session", "src", "dur", "tokens", "cost", "project"].join("\t") + "\n",
+    );
+    for (const e of all.slice(0, limit)) {
+      const dur = (e.durationMs / 60_000).toFixed(0) + "m";
+      const tok = (e.totalTokens / 1000).toFixed(0) + "k";
+      const cost = "$" + e.totalUsd.toFixed(2);
+      process.stdout.write(
+        [e.recordedAt.slice(0, 16), e.sessionId.slice(0, 8), e.source, dur, tok, cost, e.project].join("\t") + "\n",
+      );
+    }
+    return 0;
+  }
+  if (sub === "clear") {
+    clearHistory();
+    process.stderr.write(`history cleared (${HISTORY_PATH})\n`);
+    return 0;
+  }
+  if (sub === "export") {
+    const all = readHistory();
+    process.stdout.write(JSON.stringify(all, null, 2) + "\n");
+    return 0;
+  }
+  process.stderr.write(`unknown history subcommand: ${sub} (try list/clear/export)\n`);
+  return 2;
+}
+
 async function main(): Promise<number> {
   const parsed = parseArgv(process.argv);
   if (parsed.flags.version === true || parsed.flags.v === true) {
@@ -371,6 +420,8 @@ async function main(): Promise<number> {
       return cmdSources();
     case "doctor":
       return cmdDoctor();
+    case "history":
+      return cmdHistory(parsed);
     default:
       process.stderr.write(`unknown command: ${parsed.command}\n${help()}`);
       return 2;
