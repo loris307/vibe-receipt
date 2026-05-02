@@ -93,6 +93,10 @@ export const ReceiptSchema = v.object({
     truncatedOutputs: v.number(),
     hookErrors: v.number(),
     longestUserMsgChars: v.number(),
+    promptCount: v.number(),
+    longestPromptChars: v.number(),
+    shortestPromptChars: v.number(),
+    avgPromptChars: v.number(),
   }),
 
   firstPrompt: v.object({

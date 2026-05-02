@@ -94,6 +94,7 @@ function personalityToNormalized(p: Awaited<ReturnType<typeof extractClaudePerso
     truncatedOutputs: p.truncatedOutputs,
     hookErrors: p.hookErrors,
     longestUserMsgChars: p.longestUserMsgChars,
+    promptLengths: p.promptLengths,
 
     firstPrompt: p.firstPrompt,
   };

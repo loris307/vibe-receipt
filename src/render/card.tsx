@@ -462,7 +462,7 @@ export function VibeCard({ receipt, s, size }: CardProps): React.ReactElement {
         <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
           <Divider />
           <SectionHeader>{s.sectionFirstPrompt}</SectionHeader>
-          <div style={{ display: "flex", marginBottom: 6, width: "100%" }}>
+          <div style={{ display: "flex", marginBottom: 12, width: "100%" }}>
             <span
               style={{
                 fontFamily: theme.monoFamily,
@@ -476,6 +476,23 @@ export function VibeCard({ receipt, s, size }: CardProps): React.ReactElement {
                 : `${receipt.firstPrompt.wordCount} ${s.fpUnit}  ·  ${receipt.firstPrompt.moodEmoji}  ·  ${s.fpFooterShaPrefix}${receipt.firstPrompt.fingerprintSha}`}
             </span>
           </div>
+          {receipt.personality.promptCount > 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
+              <Row label={s.labelPrompts} value={String(receipt.personality.promptCount)} />
+              <Row
+                label={s.labelLongestPrompt}
+                value={`${receipt.personality.longestPromptChars} chars`}
+              />
+              <Row
+                label={s.labelShortestPrompt}
+                value={`${receipt.personality.shortestPromptChars} chars`}
+              />
+              <Row
+                label={s.labelAvgPrompt}
+                value={`${receipt.personality.avgPromptChars} chars`}
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
 

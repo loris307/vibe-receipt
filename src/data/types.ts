@@ -49,6 +49,10 @@ export interface NormalizedSession {
   hookErrors: number;
   longestUserMsgChars: number;
 
+  /** All real user prompt lengths in chars, in chronological order. Empty for sources that
+   *  cannot enumerate user inputs (e.g. minimal Codex extracts). */
+  promptLengths: number[];
+
   firstPrompt: string | null;
 
   inFlight?: boolean;

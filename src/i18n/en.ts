@@ -40,6 +40,10 @@ export const en = {
   labelSlash: "slash",
   labelTruncated: "truncated",
   labelHookErrors: "hook errors",
+  labelPrompts: "prompts",
+  labelLongestPrompt: "longest prompt",
+  labelShortestPrompt: "shortest prompt",
+  labelAvgPrompt: "avg prompt",
 
   fpUnit: "words",
   fpFooterShaPrefix: "sha:",

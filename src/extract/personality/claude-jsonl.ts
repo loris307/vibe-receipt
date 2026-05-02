@@ -39,6 +39,7 @@ export interface ClaudePersonality {
   truncatedOutputs: number;
   hookErrors: number;
   longestUserMsgChars: number;
+  promptLengths: number[];
 
   firstPrompt: string | null;
 
@@ -86,6 +87,50 @@ function extractSlashFromContent(s: string): string | null {
   return m ? `/${m[1]}` : null;
 }
 
+/**
+ * Strip system-injected wrapper tags from a user message to recover the real
+ * user-typed text. Used by the prompt-stats accumulator so system reminders /
+ * slash command wrappers / local-command stdout don't inflate prompt lengths.
+ *
+ * Wrapper inventory (verified against real JSONLs):
+ * - <system-reminder>           : auto-injected reminders
+ * - <command-name|message|args> : slash commands
+ * - <local-command-stdout|stderr|caveat> : `! cmd` shell exec results
+ * - <task-notification>         : subagent talkback events
+ * - <user-prompt-submit-hook>   : hook output
+ * - <task>                      : agent task wrappers
+ */
+function cleanUserText(s: string): string {
+  return s
+    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
+    .replace(/<command-name>[\s\S]*?<\/command-name>/g, "")
+    .replace(/<command-message>[\s\S]*?<\/command-message>/g, "")
+    .replace(/<command-args>[\s\S]*?<\/command-args>/g, "")
+    .replace(/<local-command-stdout>[\s\S]*?<\/local-command-stdout>/g, "")
+    .replace(/<local-command-stderr>[\s\S]*?<\/local-command-stderr>/g, "")
+    .replace(/<local-command-caveat>[\s\S]*?<\/local-command-caveat>/g, "")
+    .replace(/<task-notification>[\s\S]*?<\/task-notification>/g, "")
+    .replace(/<user-prompt-submit-hook>[\s\S]*?<\/user-prompt-submit-hook>/g, "")
+    .trim();
+}
+
+/**
+ * A user event is a real typed prompt only if:
+ *   - origin is not a task-notification (subagent talkback)
+ *   - it has string content (or text-array content)
+ *   - after stripping all known system wrappers, residual text is non-empty
+ */
+function isRealUserPrompt(evt: any): { real: string } | null {
+  // Subagent-driven task notifications appear as type:"user" with origin.kind:"task-notification"
+  if (evt?.origin?.kind === "task-notification") return null;
+  const str = userEventStringContent(evt);
+  if (str === null) return null;
+  if (isCommandWrapper(str)) return null;
+  const real = cleanUserText(str);
+  if (real.length === 0) return null;
+  return { real };
+}
+
 export async function extractClaudePersonality(
   filePath: string,
 ): Promise<ClaudePersonality> {
@@ -124,6 +169,7 @@ export async function extractClaudePersonality(
     truncatedOutputs: 0,
     hookErrors: 0,
     longestUserMsgChars: 0,
+    promptLengths: [],
 
     firstPrompt: null,
     claudeCodeVersion: null,
@@ -195,14 +241,16 @@ export async function extractClaudePersonality(
 
     if (type === "user") {
       const str = userEventStringContent(evt);
-      if (str !== null) {
-        if (!isCommandWrapper(str)) {
-          if (!out.firstPrompt) out.firstPrompt = str;
-          if (str.length > out.longestUserMsgChars) out.longestUserMsgChars = str.length;
-        } else {
-          const slash = extractSlashFromContent(str);
-          if (slash) slashSet.add(slash);
-        }
+      if (str !== null && isCommandWrapper(str)) {
+        const slash = extractSlashFromContent(str);
+        if (slash) slashSet.add(slash);
+      }
+      const realPrompt = isRealUserPrompt(evt);
+      if (realPrompt) {
+        out.promptLengths.push(realPrompt.real.length);
+        if (!out.firstPrompt) out.firstPrompt = realPrompt.real;
+        if (realPrompt.real.length > out.longestUserMsgChars)
+          out.longestUserMsgChars = realPrompt.real.length;
       }
       // tool_result + toolUseResult — count file/bash effects
       const tur = evt.toolUseResult;

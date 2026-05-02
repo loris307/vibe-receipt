@@ -31,6 +31,7 @@ export interface CodexPersonality {
   thinkingMs: number;
   firstPrompt: string | null;
   longestUserMsgChars: number;
+  promptLengths: number[];
 }
 
 const TOP_FILES_LIMIT = 5;
@@ -94,6 +95,7 @@ export async function extractCodexPersonality(filePath: string): Promise<CodexPe
     thinkingMs: 0,
     firstPrompt: null,
     longestUserMsgChars: 0,
+    promptLengths: [],
   };
 
   if (events.length === 0) return out;
@@ -137,9 +139,12 @@ export async function extractCodexPersonality(filePath: string): Promise<CodexPe
     if (type === "response_item") {
       const innerType = payload.type;
       if (innerType === "user_message" && typeof payload.text === "string") {
-        if (!out.firstPrompt) out.firstPrompt = payload.text;
-        if (payload.text.length > out.longestUserMsgChars)
-          out.longestUserMsgChars = payload.text.length;
+        const text = payload.text.trim();
+        if (text.length > 0) {
+          out.promptLengths.push(text.length);
+          if (!out.firstPrompt) out.firstPrompt = text;
+          if (text.length > out.longestUserMsgChars) out.longestUserMsgChars = text.length;
+        }
       } else if (innerType === "function_call") {
         const name = String(payload.name ?? "");
         if (!name) continue;

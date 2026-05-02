@@ -139,6 +139,7 @@ export const loadCodexSessions: SourceLoader = async (opts) => {
       truncatedOutputs: 0,
       hookErrors: 0,
       longestUserMsgChars: p.longestUserMsgChars,
+      promptLengths: p.promptLengths,
 
       firstPrompt: p.firstPrompt,
     };
@@ -199,6 +200,7 @@ export async function loadCodexFromFile(filePath: string): Promise<NormalizedSes
     truncatedOutputs: 0,
     hookErrors: 0,
     longestUserMsgChars: p.longestUserMsgChars,
+    promptLengths: p.promptLengths,
 
     firstPrompt: p.firstPrompt,
   };

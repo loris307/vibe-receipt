@@ -150,6 +150,13 @@ export function renderAnsi(receipt: Receipt, s: Strings): string {
       `  ${receipt.firstPrompt.wordCount} ${s.fpUnit}  ·  ${receipt.firstPrompt.moodEmoji}  ·  ${s.fpFooterShaPrefix}${receipt.firstPrompt.fingerprintSha}`,
     );
   }
+  if (receipt.personality.promptCount > 0) {
+    lines.push("");
+    lines.push(row(s.labelPrompts, String(receipt.personality.promptCount)));
+    lines.push(row(s.labelLongestPrompt, `${receipt.personality.longestPromptChars} chars`));
+    lines.push(row(s.labelShortestPrompt, `${receipt.personality.shortestPromptChars} chars`));
+    lines.push(row(s.labelAvgPrompt, `${receipt.personality.avgPromptChars} chars`));
+  }
   lines.push("");
   lines.push(chalk.dim(`        ${s.footerGen}`));
   lines.push(chalk.dim(`        ${s.footerRepo}`));

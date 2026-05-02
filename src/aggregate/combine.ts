@@ -3,6 +3,7 @@ import type { Receipt, ReceiptScope, Subagent, TopFile } from "../data/receipt-s
 import type { NormalizedSession, Source } from "../data/types.js";
 import { topToolStats } from "../data/types.js";
 import { computeFirstPromptFingerprint } from "../redact/fingerprint.js";
+import { promptStatsOf } from "./prompt-stats.js";
 
 const TOP_FILES_LIMIT = 5;
 const SUBAGENT_LIMIT = 8;
@@ -50,6 +51,7 @@ export function buildCombinedReceipt(
   let truncatedOutputs = 0;
   let hookErrors = 0;
   let longestUserMsgChars = 0;
+  const promptLengths: number[] = [];
   const skillSet = new Set<string>();
   const slashSet = new Set<string>();
   const modelSet = new Set<string>();
@@ -109,6 +111,7 @@ export function buildCombinedReceipt(
     hookErrors += s.hookErrors;
     if (s.longestUserMsgChars > longestUserMsgChars)
       longestUserMsgChars = s.longestUserMsgChars;
+    for (const len of s.promptLengths) promptLengths.push(len);
 
     for (const sk of s.skills) skillSet.add(sk);
     for (const sl of s.slashCommands) slashSet.add(sl);
@@ -202,6 +205,7 @@ export function buildCombinedReceipt(
       truncatedOutputs,
       hookErrors,
       longestUserMsgChars,
+      ...promptStatsOf(promptLengths),
     },
     firstPrompt: fp,
   };

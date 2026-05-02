@@ -1,4 +1,15 @@
 #!/usr/bin/env node
+// Silence ccusage's consola-style logger before any data-loader import — its info/warn lines
+// would otherwise pollute --json output to stdout.
+try {
+  const ccusageLogger: any = await import("ccusage/logger");
+  if (ccusageLogger?.logger && typeof ccusageLogger.logger.level !== "undefined") {
+    ccusageLogger.logger.level = process.env.VIBE_DEBUG ? 3 : -1;
+  }
+} catch {
+  // ccusage not installed in some test envs — fine
+}
+
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import ms from "ms";

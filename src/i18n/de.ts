@@ -42,6 +42,10 @@ export const de: Strings = {
   labelSlash: "slash",
   labelTruncated: "abgeschnitten",
   labelHookErrors: "hook-fehler",
+  labelPrompts: "prompts",
+  labelLongestPrompt: "längster",
+  labelShortestPrompt: "kürzester",
+  labelAvgPrompt: "durchschnitt",
 
   fpUnit: "wörter",
   fpFooterShaPrefix: "sha:",

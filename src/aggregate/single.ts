@@ -3,6 +3,7 @@ import type { Receipt, ReceiptScope } from "../data/receipt-schema.js";
 import type { NormalizedSession } from "../data/types.js";
 import { topToolStats } from "../data/types.js";
 import { computeFirstPromptFingerprint } from "../redact/fingerprint.js";
+import { promptStatsOf } from "./prompt-stats.js";
 
 export function buildSingleReceipt(ns: NormalizedSession): Receipt {
   const scope: ReceiptScope = { kind: "single", sessionId: ns.sessionId };
@@ -69,6 +70,7 @@ export function buildSingleReceipt(ns: NormalizedSession): Receipt {
       truncatedOutputs: ns.truncatedOutputs,
       hookErrors: ns.hookErrors,
       longestUserMsgChars: ns.longestUserMsgChars,
+      ...promptStatsOf(ns.promptLengths),
     },
 
     firstPrompt: fp,
