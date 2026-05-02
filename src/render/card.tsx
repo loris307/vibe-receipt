@@ -12,6 +12,8 @@ interface CardProps {
   receipt: Receipt;
   s: Strings;
   size: SizePreset;
+  /** Optional height override (auto-extended canvas). Falls back to SIZES[size].height. */
+  height?: number;
 }
 
 /**
@@ -236,10 +238,11 @@ function modeBadge(receipt: Receipt, s: Strings): string {
   }
 }
 
-export function VibeCard({ receipt, s, size }: CardProps): React.ReactElement {
+export function VibeCard({ receipt, s, size, height }: CardProps): React.ReactElement {
   const dim = SIZES[size];
   const padX = dim.paddingX ?? theme.paddingX;
   const padY = dim.paddingY ?? theme.paddingY;
+  const cardHeight = height ?? dim.height;
   const isCompact = size === "og";
   const totalTokens =
     receipt.cost.inputTokens +
@@ -259,7 +262,7 @@ export function VibeCard({ receipt, s, size }: CardProps): React.ReactElement {
         display: "flex",
         flexDirection: "column",
         width: dim.width,
-        height: dim.height,
+        height: cardHeight,
         background: theme.bg,
         padding: `${padY}px ${padX}px`,
         color: theme.ink,
@@ -476,7 +479,7 @@ export function VibeCard({ receipt, s, size }: CardProps): React.ReactElement {
               />
             </div>
           ) : null}
-          {receipt.firstPrompt.preview ? (
+          {receipt.firstPrompt.revealed || receipt.firstPrompt.preview ? (
             <div
               style={{
                 display: "flex",
@@ -506,7 +509,7 @@ export function VibeCard({ receipt, s, size }: CardProps): React.ReactElement {
                     color: theme.ink,
                   }}
                 >
-                  {`"${receipt.firstPrompt.preview}"`}
+                  {`"${receipt.firstPrompt.revealed ?? receipt.firstPrompt.preview}"`}
                 </span>
               </div>
             </div>

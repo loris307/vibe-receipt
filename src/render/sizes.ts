@@ -1,3 +1,5 @@
+import type { Receipt } from "../data/receipt-schema.js";
+
 export type SizePreset = "portrait" | "story" | "og";
 
 export interface SizeSpec {
@@ -14,6 +16,83 @@ export const SIZES: Record<SizePreset, SizeSpec> = {
   story: { width: 1080, height: 1920 },
   og: { width: 1200, height: 630, paddingX: 48, paddingY: 36 },
 };
+
+/**
+ * Estimate the rendered receipt height, in px, based on which sections will appear.
+ * Used to auto-extend the canvas so we never clip content. Values calibrated against
+ * actual rendered cards from real sessions; conservative (over-estimates slightly).
+ */
+export function estimateReceiptHeight(r: Receipt, base: SizePreset): number {
+  if (base === "og") return SIZES.og.height; // OG is fixed/clipped by design
+  let h = 270; // masthead + subtitle + date + project line + initial padding
+
+  // SESSION
+  h += 60; // section header
+  const isMulti = r.meta.sessionCount > 1;
+  h += isMulti ? 36 * 3 : 36; // sessions/wall/active OR duration
+  h += 36 * 4; // model/tokens/cost/cache
+  h += 50; // divider
+
+  // WORK
+  h += 60;
+  h += 36 * 4;
+  if (r.work.webFetches > 0) h += 36;
+  h += 50;
+
+  // TOP TOOLS
+  if (r.tools.top.length > 0) {
+    h += 60 + 30 * Math.min(5, r.tools.top.length);
+    h += 50;
+  }
+
+  // SUBAGENTS
+  if (r.subagents.length > 0) {
+    const lines = base === "story" ? 6 : 4;
+    h += 60 + 30 * Math.min(lines, r.subagents.length);
+    h += 50;
+  }
+
+  // PERSONALITY
+  let pRows = 0;
+  if (r.time.afkMs > 1000) pRows++;
+  if (r.personality.escInterrupts > 0) pRows++;
+  if (r.personality.permissionFlips > 0) pRows++;
+  if (r.personality.yoloEvents > 0) pRows++;
+  if (r.personality.thinkingMs > 1000) pRows++;
+  if (r.personality.skills.length > 0) pRows++;
+  if (r.personality.slashCommands.length > 0) pRows++;
+  h += 60 + 36 * pRows;
+  h += 50;
+
+  // PROMPTING
+  if (r.personality.promptCount > 0) {
+    h += 60 + 36 * 3; // header + prompts/longest/avg
+    if (r.firstPrompt.preview) {
+      // approx 1 line ~36, but long previews wrap to 2 lines
+      h += r.firstPrompt.preview.length > 50 ? 80 : 50;
+    }
+    if (r.personality.shortestPromptText) h += 36;
+    h += 36; // mood/sha
+    h += 50;
+  }
+
+  // FOOTER
+  h += 100;
+
+  return h;
+}
+
+/**
+ * Pick a height for the requested preset. For portrait/story we use max(preset, estimated)
+ * so heavy receipts auto-extend without clipping; OG is fixed.
+ */
+export function resolveHeight(r: Receipt, base: SizePreset): number {
+  if (base === "og") return SIZES.og.height;
+  const baseH = SIZES[base].height;
+  const estimated = estimateReceiptHeight(r, base);
+  // Add a small bottom buffer so the footer doesn't hug the edge
+  return Math.max(baseH, estimated + 40);
+}
 
 export function parseSizeFlag(input: string | undefined): SizePreset[] {
   if (!input) return ["portrait"];

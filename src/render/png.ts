@@ -6,7 +6,7 @@ import type { Strings } from "../i18n/index.js";
 import { VibeCard } from "./card.js";
 import { loadFonts } from "./theme.js";
 import type { SizePreset } from "./sizes.js";
-import { SIZES } from "./sizes.js";
+import { SIZES, resolveHeight } from "./sizes.js";
 
 export interface RenderPngOpts {
   receipt: Receipt;
@@ -25,14 +25,16 @@ function satoriFonts(): SatoriOptions["fonts"] {
 
 export async function renderPng(opts: RenderPngOpts): Promise<Buffer> {
   const dim = SIZES[opts.size];
+  const height = resolveHeight(opts.receipt, opts.size);
   const element = React.createElement(VibeCard, {
     receipt: opts.receipt,
     s: opts.s,
     size: opts.size,
+    height,
   });
   const svg = await satori(element, {
     width: dim.width,
-    height: dim.height,
+    height,
     fonts: satoriFonts(),
   });
   const resvg = new Resvg(svg, {
@@ -48,14 +50,16 @@ export async function renderPng(opts: RenderPngOpts): Promise<Buffer> {
 
 export async function renderSvg(opts: RenderPngOpts): Promise<string> {
   const dim = SIZES[opts.size];
+  const height = resolveHeight(opts.receipt, opts.size);
   const element = React.createElement(VibeCard, {
     receipt: opts.receipt,
     s: opts.s,
     size: opts.size,
+    height,
   });
   return satori(element, {
     width: dim.width,
-    height: dim.height,
+    height,
     fonts: satoriFonts(),
   });
 }

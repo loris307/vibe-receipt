@@ -23,6 +23,19 @@ export function getClaudeJsonlRoots(): string[] {
   ];
 }
 
+/**
+ * Returns true for paths Claude Code treats as a sub-transcript (subagent dispatches),
+ * which we MUST exclude — they are not independent sessions; their data is already
+ * counted in the parent session's `Agent` tool_use blocks.
+ *
+ * Layout we observe in the wild:
+ *   ~/.claude/projects/<slug>/<session-uuid>.jsonl                ← real session ✓
+ *   ~/.claude/projects/<slug>/<session-uuid>/subagents/agent-*.jsonl  ← subagent ✗
+ */
+function isSubagentJsonl(path: string): boolean {
+  return path.includes("/subagents/") || /\/agent-[a-z0-9]+\.jsonl$/i.test(path);
+}
+
 async function listJsonlFilesWithMtime(): Promise<{ path: string; mtimeMs: number }[]> {
   const roots = getClaudeJsonlRoots();
   const out: { path: string; mtimeMs: number }[] = [];
@@ -33,6 +46,7 @@ async function listJsonlFilesWithMtime(): Promise<{ path: string; mtimeMs: numbe
         const abs = resolve(root, String(file));
         if (seen.has(abs)) continue;
         seen.add(abs);
+        if (isSubagentJsonl(abs)) continue;
         try {
           const s = await stat(abs);
           out.push({ path: abs, mtimeMs: s.mtimeMs });

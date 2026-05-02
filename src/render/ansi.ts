@@ -148,9 +148,10 @@ export function renderAnsi(receipt: Receipt, s: Strings): string {
     lines.push(row(s.labelLongestPrompt, `${receipt.personality.longestPromptChars} chars`));
     lines.push(row(s.labelAvgPrompt, `${receipt.personality.avgPromptChars} chars`));
   }
-  if (receipt.firstPrompt.preview) {
+  const firstShown = receipt.firstPrompt.revealed ?? receipt.firstPrompt.preview;
+  if (firstShown) {
     lines.push("");
-    lines.push(`  ${chalk.dim(s.labelFirstPreview.padEnd(10))} "${receipt.firstPrompt.preview}"`);
+    lines.push(`  ${chalk.dim(s.labelFirstPreview.padEnd(10))} "${firstShown}"`);
   }
   if (receipt.personality.shortestPromptText) {
     const txt = receipt.personality.shortestPromptText.replace(/\s+/g, " ").trim().slice(0, 80);
@@ -158,14 +159,9 @@ export function renderAnsi(receipt: Receipt, s: Strings): string {
       `  ${chalk.dim(s.labelShortestText.padEnd(10))} "${txt}" (${receipt.personality.shortestPromptChars} chars)`,
     );
   }
-  if (receipt.firstPrompt.revealed) {
-    lines.push("");
-    lines.push(`  "${receipt.firstPrompt.revealed}"`);
-  } else {
-    lines.push(
-      `  ${chalk.dim(`${receipt.firstPrompt.moodEmoji} · ${s.fpFooterShaPrefix}${receipt.firstPrompt.fingerprintSha}`)}`,
-    );
-  }
+  lines.push(
+    `  ${chalk.dim(`${receipt.firstPrompt.moodEmoji} · ${s.fpFooterShaPrefix}${receipt.firstPrompt.fingerprintSha}`)}`,
+  );
   lines.push("");
   lines.push(chalk.dim(`        ${s.footerGen}`));
   lines.push(chalk.dim(`        ${s.footerRepo}`));

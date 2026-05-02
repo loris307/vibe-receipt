@@ -13,6 +13,10 @@ interface SourceRow {
   totalSizeKb: number;
 }
 
+function isSubagentJsonl(path: string): boolean {
+  return path.includes("/subagents/") || /\/agent-[a-z0-9]+\.jsonl$/i.test(path);
+}
+
 async function summarizeRoot(source: string, root: string): Promise<SourceRow> {
   if (!existsSync(root)) return { source, root, exists: false, fileCount: 0, totalSizeKb: 0 };
   let count = 0;
@@ -20,6 +24,7 @@ async function summarizeRoot(source: string, root: string): Promise<SourceRow> {
   try {
     for await (const file of glob("**/*.jsonl", { cwd: root, withFileTypes: false })) {
       const abs = resolve(root, String(file));
+      if (source === "claude" && isSubagentJsonl(abs)) continue;
       try {
         bytes += statSync(abs).size;
         count += 1;
