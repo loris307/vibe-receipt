@@ -75,11 +75,11 @@ vibe-receipt today                       # everything since midnight (local)
 vibe-receipt week                        # last 7 days
 vibe-receipt year                        # current calendar year
 
-# Output formats
-vibe-receipt --size portrait    # default · 1080×1500 · IG-feed-friendly
-vibe-receipt --size story       # 1080×1920 · IG/TikTok story
-vibe-receipt --size og          # 1200×630 · link-unfurl
-vibe-receipt --size all         # writes all three
+# Output formats — different sizes always produce different files (suffix in name)
+vibe-receipt --size portrait    # default · 1080×min 1500, auto-extends if heavy content
+vibe-receipt --size story       # 1080×1920 fixed · IG/TikTok story
+vibe-receipt --size og          # 1200×630 fixed · link-unfurl preview
+vibe-receipt --size all         # writes all three (no overwriting)
 
 # JSON instead of PNG
 vibe-receipt --json

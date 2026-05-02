@@ -82,14 +82,20 @@ export function estimateReceiptHeight(r: Receipt, base: SizePreset): number {
 }
 
 /**
- * Pick a height for the requested preset. For portrait/story we use max(preset, estimated)
- * so heavy receipts auto-extend without clipping; OG is fixed.
+ * Pick a height for the requested preset.
+ *  - `portrait` (the default) auto-extends past 1500 if content is heavy — keeps
+ *    receipts from clipping while staying close to IG-feed proportions.
+ *  - `story` is FIXED at 1080×1920 (user explicitly picked story aspect).
+ *  - `og` is FIXED at 1200×630.
+ *
+ * If a size flag is requested explicitly, we honor those exact dimensions; only
+ * the implicit default-portrait gets to grow.
  */
 export function resolveHeight(r: Receipt, base: SizePreset): number {
   if (base === "og") return SIZES.og.height;
-  const baseH = SIZES[base].height;
-  const estimated = estimateReceiptHeight(r, base);
-  // Add a small bottom buffer so the footer doesn't hug the edge
+  if (base === "story") return SIZES.story.height;
+  const baseH = SIZES.portrait.height;
+  const estimated = estimateReceiptHeight(r, "portrait");
   return Math.max(baseH, estimated + 40);
 }
 

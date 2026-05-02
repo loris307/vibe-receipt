@@ -179,11 +179,12 @@ async function emit(opts: {
 
   const outFlag = typeof flags.out === "string" ? flags.out : null;
   for (const size of sizes) {
-    const sizeSuffix = sizes.length > 1 ? `-${size}` : "";
+    // Always suffix size in the default filename so different --size flags
+    // don't overwrite each other on subsequent runs.
     const outPath =
       outFlag && sizes.length === 1
         ? resolve(outFlag)
-        : defaultOut(`${baseId}${sizeSuffix}`);
+        : defaultOut(`${baseId}-${size}`);
     ensureDir(outPath);
     const png = await renderPng({ receipt, s: sStrings, size });
     writeFileSync(outPath, png);
