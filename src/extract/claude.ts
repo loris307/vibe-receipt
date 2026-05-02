@@ -120,15 +120,14 @@ function personalityToNormalized(p: Awaited<ReturnType<typeof extractClaudePerso
  * Sums input/output/cache_creation/cache_read tokens across distinct (msg.id, requestId) pairs.
  * Cost = 0 in fallback (we'd need pricing table; ccusage handles it when used).
  */
-async function fallbackTokenSum(
-  filePath: string,
-  sinceMs?: number,
-): Promise<{
+interface TokenSum {
   inputTokens: number;
   outputTokens: number;
   cacheCreateTokens: number;
   cacheReadTokens: number;
-}> {
+}
+
+async function sumTokensInFile(filePath: string, sinceMs?: number): Promise<TokenSum> {
   const events = await readJsonlAll<any>(filePath);
   const seen = new Set<string>();
   let inputTokens = 0;
@@ -155,6 +154,49 @@ async function fallbackTokenSum(
     cacheReadTokens += Number(usage.cache_read_input_tokens ?? 0);
   }
   return { inputTokens, outputTokens, cacheCreateTokens, cacheReadTokens };
+}
+
+/**
+ * Sum tokens for a main session's JSONL PLUS its subagent transcripts.
+ *
+ * Layout:
+ *   ~/.claude/projects/<slug>/<sessId>.jsonl                ← parent
+ *   ~/.claude/projects/<slug>/<sessId>/subagents/agent-*.jsonl  ← subagent transcripts
+ *
+ * Each subagent makes its own API calls — Anthropic bills them separately, so they
+ * MUST be added to the parent's cost. We don't promote subagents to standalone
+ * sessions (their work is already summarized via Agent tool_use in the parent).
+ */
+async function fallbackTokenSum(
+  filePath: string,
+  sinceMs?: number,
+): Promise<TokenSum> {
+  const main = await sumTokensInFile(filePath, sinceMs);
+  // Subagent transcripts live under <parent-without-extension>/subagents/*.jsonl
+  const parentBase = filePath.replace(/\.jsonl$/, "");
+  const subagentDir = resolve(parentBase, "subagents");
+  let subInput = 0;
+  let subOutput = 0;
+  let subCreate = 0;
+  let subRead = 0;
+  try {
+    for await (const file of glob("*.jsonl", { cwd: subagentDir, withFileTypes: false })) {
+      const subPath = resolve(subagentDir, String(file));
+      const sub = await sumTokensInFile(subPath, sinceMs);
+      subInput += sub.inputTokens;
+      subOutput += sub.outputTokens;
+      subCreate += sub.cacheCreateTokens;
+      subRead += sub.cacheReadTokens;
+    }
+  } catch {
+    // no subagents dir — fine
+  }
+  return {
+    inputTokens: main.inputTokens + subInput,
+    outputTokens: main.outputTokens + subOutput,
+    cacheCreateTokens: main.cacheCreateTokens + subCreate,
+    cacheReadTokens: main.cacheReadTokens + subRead,
+  };
 }
 
 /**
