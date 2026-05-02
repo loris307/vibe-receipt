@@ -8,12 +8,14 @@ import { compactNumber, formatPercent, formatUsd } from "../util/compact-number.
 import { formatDurationMs } from "../util/duration.js";
 import { truncateShortestText } from "../redact/smart-redact.js";
 
-/** Substitute tagline placeholders ({n}, {r}, {e}, {d}, {hh}, {mm}) with concrete values. */
+/** Substitute tagline placeholders ({n}, {r}, {e}, {d}, {hh}, {mm}) with concrete values.
+ *  Time is shown in UTC (matches the header) so receipts are deterministic
+ *  regardless of which machine renders them. */
 function renderArchetypeTagline(template: string, r: Receipt): string {
   if (!template) return "";
-  const startDate = new Date(r.time.startUtc);
-  const hh = String(startDate.getHours()).padStart(2, "0");
-  const mm = String(startDate.getMinutes()).padStart(2, "0");
+  // Slice the ISO string directly to keep it UTC and stable.
+  const hh = r.time.startUtc.slice(11, 13);
+  const mm = r.time.startUtc.slice(14, 16);
   const ak = r.archetype.key;
   // For each archetype, decide which {n} stands for what
   let n = "0";

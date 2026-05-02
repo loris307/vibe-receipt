@@ -66,8 +66,9 @@ const CATALOG: Rule[] = [
     key: "night-owl",
     glyph: "🌙",
     trigger: (r) => {
-      const h = new Date(r.time.startUtc).getHours();
-      return h >= 22 || h < 6;
+      // UTC-based for determinism (matches archetype rule + header timestamp)
+      const h = parseInt(r.time.startUtc.slice(11, 13), 10);
+      return Number.isFinite(h) && (h >= 22 || h < 6);
     },
   },
   {

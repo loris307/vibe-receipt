@@ -117,8 +117,18 @@ function extractSlashFromContent(s: string): string | null {
  * - <user-prompt-submit-hook>   : hook output
  * - <task>                      : agent task wrappers
  */
+/**
+ * Auto-generated bracketed user-side messages that Claude Code injects in
+ * response to UI events (ESC-interrupt, etc.). These look like type:"user"
+ * but were never typed by the human and must NOT count as real prompts.
+ */
+const AUTO_USER_MESSAGES: ReadonlyArray<RegExp> = [
+  /^\[Request interrupted by user(?: for tool use)?\]\.?$/i,
+  /^\[Tool execution interrupted\]\.?$/i,
+];
+
 function cleanUserText(s: string): string {
-  return s
+  const cleaned = s
     .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
     .replace(/<command-name>[\s\S]*?<\/command-name>/g, "")
     .replace(/<command-message>[\s\S]*?<\/command-message>/g, "")
@@ -129,6 +139,11 @@ function cleanUserText(s: string): string {
     .replace(/<task-notification>[\s\S]*?<\/task-notification>/g, "")
     .replace(/<user-prompt-submit-hook>[\s\S]*?<\/user-prompt-submit-hook>/g, "")
     .trim();
+  // Strip auto-generated stock messages (ESC interrupts etc.)
+  for (const re of AUTO_USER_MESSAGES) {
+    if (re.test(cleaned)) return "";
+  }
+  return cleaned;
 }
 
 /**

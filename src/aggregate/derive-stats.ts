@@ -68,7 +68,10 @@ export function computeMostEditedFile(entries: TopFile[]): MostEditedFile | null
       bestCount = count;
     }
   }
-  if (best === null || bestCount <= 1) return null;
+  // Threshold: at least 3 edits to be a meaningful "most edited". A file
+  // edited 2× when everyone else was edited 1× is technically max but not
+  // a story worth telling.
+  if (best === null || bestCount < 3) return null;
   return {
     path: best.path,
     editCount: bestCount,

@@ -50,6 +50,10 @@ export function extractFeatures(
   const c = ns.toolCounts ?? {};
   const readish = (c.Read ?? 0) + (c.Grep ?? 0) + (c.WebFetch ?? 0) + (c.Glob ?? 0);
   const editish = (c.Edit ?? 0) + (c.Write ?? 0) + (c.MultiEdit ?? 0);
+  // UTC-based hour for deterministic archetype assignment regardless of
+  // which machine renders the receipt. The header also displays UTC time,
+  // so this stays consistent.
+  const utcHour = parseInt(r.time.startUtc.slice(11, 13), 10);
   return {
     promptCount: r.personality.promptCount,
     avgPromptChars: r.personality.avgPromptChars,
@@ -64,7 +68,7 @@ export function extractFeatures(
     durationMs: r.time.durationMs,
     escInterrupts: r.personality.escInterrupts,
     rateLimitHits: r.cost.rateLimitHits,
-    startHourLocal: new Date(r.time.startUtc).getHours(),
+    startHourLocal: Number.isFinite(utcHour) ? utcHour : 12,
   };
 }
 

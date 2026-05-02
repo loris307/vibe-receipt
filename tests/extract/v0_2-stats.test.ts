@@ -34,6 +34,28 @@ function userEvent(ts: string, text: string) {
   };
 }
 
+describe("phantom prompt filtering", () => {
+  it("does not count [Request interrupted by user for tool use] as a real prompt", async () => {
+    const path = await makeFixture([
+      userEvent("2026-01-01T00:00:00Z", "real prompt"),
+      userEvent("2026-01-01T00:01:00Z", "[Request interrupted by user for tool use]"),
+      userEvent("2026-01-01T00:02:00Z", "another real prompt"),
+    ]);
+    const p = await extractClaudePersonality(path);
+    expect(p.promptLengths.length).toBe(2); // not 3
+    expect(p.promptTexts).toEqual(["real prompt", "another real prompt"]);
+  });
+
+  it("does not count [Request interrupted by user] (short variant)", async () => {
+    const path = await makeFixture([
+      userEvent("2026-01-01T00:00:00Z", "real"),
+      userEvent("2026-01-01T00:01:00Z", "[Request interrupted by user]"),
+    ]);
+    const p = await extractClaudePersonality(path);
+    expect(p.promptLengths.length).toBe(1);
+  });
+});
+
 describe("longest solo-stretch", () => {
   it("0 ms with no prompts", async () => {
     const path = await makeFixture([
@@ -608,6 +630,15 @@ describe("most-edited file", () => {
       computeMostEditedFile([
         { path: "a.ts", added: 5, removed: 0, editCount: 1 },
         { path: "b.ts", added: 3, removed: 0, editCount: 1 },
+      ]),
+    ).toBeNull();
+  });
+
+  it("returns null when max is 2 (threshold is >=3)", () => {
+    expect(
+      computeMostEditedFile([
+        { path: "a.ts", added: 50, removed: 0, editCount: 2 },
+        { path: "b.ts", added: 5, removed: 0, editCount: 1 },
       ]),
     ).toBeNull();
   });
