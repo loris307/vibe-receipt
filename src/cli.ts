@@ -22,6 +22,8 @@ import { pickMostRecent } from "./aggregate/pick-most-recent.js";
 import { applyRedaction, parseRevealFlag, withRawPrompt } from "./redact/smart-redact.js";
 import { NO_REVEAL } from "./data/types.js";
 import { recordSession } from "./history/record.js";
+import { readHistory } from "./history/store.js";
+import { deriveComparison } from "./aggregate/comparisons.js";
 import { renderPng } from "./render/png.js";
 import { renderAnsi } from "./render/ansi.js";
 import { parseSizeFlag, type SizePreset } from "./render/sizes.js";
@@ -154,6 +156,17 @@ async function emit(opts: {
 
   let receipt = opts.receipt;
   if (rawFirstPrompt) receipt = withRawPrompt(receipt, rawFirstPrompt);
+
+  // v0.2 — derive comparisons against persistent history BEFORE recording the
+  // current session (self-exclusion handles the case where the current session
+  // is already in history from a prior render).
+  try {
+    const history = readHistory();
+    const comparison = deriveComparison(receipt, history);
+    if (comparison) receipt = { ...receipt, comparison };
+  } catch {
+    // ignore — comparisons are best-effort
+  }
 
   // Record session history in ALWAYS-redacted form (privacy-safe regardless
   // of user's --reveal choices). Best-effort, never blocks render.

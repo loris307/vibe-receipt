@@ -486,7 +486,7 @@ Medium — neue Infra, neue Filesystem-Interaktionen. Gut isoliert in `src/histo
 
 ---
 
-## Phase 5 — Comparisons (vs last session, vs last 7 days)
+## Phase 5 — Comparisons (vs last session, vs last 7 days) ✅ DONE
 
 **Depends on Phase 4.**
 
