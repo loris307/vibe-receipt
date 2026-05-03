@@ -192,10 +192,10 @@ Replace both lines with one:
 Run:
 
 ```bash
-grep -n "pickLang\|--lang\|lang" /Users/lorisgaller/Desktop/Projekte/vibe-receipt/src/cli.ts | grep -v 'language' | head
+grep -nE 'pickLang|--lang |flags\.lang' /Users/lorisgaller/Desktop/Projekte/vibe-receipt/src/cli.ts
 ```
 
-Expected: zero matches. (The `grep -v 'language'` strips a possible incidental occurrence if any; if "language" appears in another comment, that's fine.)
+Expected: zero matches. (Patterns are anchored: `pickLang` literal, `--lang` followed by a space (the flag in help text), and `flags.lang` (the runtime read). Bare-word `lang` is intentionally NOT matched to avoid false positives on `language`, `slang`, etc.)
 
 ---
 
@@ -293,15 +293,17 @@ Delete those three lines (heading, blank line, body sentence).
 
 The `---` divider on the line before and after the section bracket adjacent sections — leave them; the result will read `Where the data comes from … (divider) … Troubleshooting`. Verify by reading the surrounding 5 lines after the edit.
 
-- [ ] **Step 6.3: Verify README has no German references**
+- [ ] **Step 6.3: Verify README has no stray German render references**
 
 Run:
 
 ```bash
-grep -n "VIBE BON\|--lang\|german\|Language" /Users/lorisgaller/Desktop/Projekte/vibe-receipt/README.md
+grep -nE 'VIBE BON|--lang|^## Languages' /Users/lorisgaller/Desktop/Projekte/vibe-receipt/README.md
 ```
 
-Expected: zero matches. (If `Language` appears as part of "Languages" section it means the deletion didn't land — re-do step 6.2.)
+Expected: zero matches.
+
+> **Important:** README.md:130 contains the phrase "(English + German patterns)" describing the politeness-row stat. **This is intentionally kept** per the spec's "Out of scope" section — it documents `src/extract/politeness.ts`'s prompt-detection regexes, which are unchanged. The grep above is anchored so it does NOT match line 130; if the executor ever broadens the grep and sees that hit, leave it alone.
 
 - [ ] **Step 6.4: Commit**
 
