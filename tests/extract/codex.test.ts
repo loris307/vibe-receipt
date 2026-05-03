@@ -87,7 +87,15 @@ describe("extractCodexPersonality (new Codex shape, v0.128+)", () => {
   it("loadCodexFromFile produces non-zero cost for new format", async () => {
     const ns = await loadCodexFromFile(NEWFMT);
     expect(ns.totalCostUsd).toBeGreaterThan(0);
-    expect(ns.inputTokens).toBe(2000);
+    // Codex JSONL: input_tokens=2000 (gross including cached), cached=1500.
+    // Loader normalizes to Claude-style net semantics: inputTokens = 500.
+    expect(ns.inputTokens).toBe(500);
+    expect(ns.cacheReadTokens).toBe(1500);
+    // Sanity: the rendered "tokens" stat (input + output + cacheCreate + cacheRead)
+    // must equal the gross 2000 + 380 = 2380 and NOT 3880 (no double-count).
+    const displayTotal =
+      ns.inputTokens + ns.outputTokens + ns.cacheCreateTokens + ns.cacheReadTokens;
+    expect(displayTotal).toBe(2380);
   });
 });
 

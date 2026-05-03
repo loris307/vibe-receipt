@@ -9,3 +9,4 @@ coverage
 *.tsbuildinfo
 .turbo
 vibe-receipts/
+.claude/scheduled_tasks.lock

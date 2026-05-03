@@ -39,3 +39,7 @@ Second-pass audit (also fixed):
 - `installHook`/`uninstallHook` cast `hooks.SessionEnd` without `Array.isArray` validation — would crash or silently overwrite on a malformed value; now refuses with a clear error
 - `backupSettings` overwrote `.bak` on every run, destroying the user's original pre-vibe-receipt state after the first round-trip — now writes the backup once and never overwrites
 - `combine` selected `firstPrompt` (and `firstCompactCarrier`) from sessions with non-finite `startUtc` because they were mapped to `ts=0` — those sessions are now skipped
+
+Third-pass (live end-to-end smoke test against fresh `codex exec` + `claude -p` sessions):
+
+- Codex `input_tokens` is GROSS (already includes `cached_input_tokens`), but the Codex loader stored both as separate fields — render formula `input + output + cacheCreate + cacheRead` then double-counted the cached portion. The 17.7k-token smoke session reported as 30k tokens with 40% cache hit when it's really 18k tokens with 66% cache hit. Loader now subtracts cached from input to align with Claude's net-input semantics; cost was already correct but is unchanged because the cost formula simplified accordingly.

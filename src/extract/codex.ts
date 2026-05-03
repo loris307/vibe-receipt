@@ -31,6 +31,13 @@ function priceFor(model: string) {
   return CODEX_PRICES_PER_MTOK.default!;
 }
 
+/**
+ * `input` here is the NET (non-cached) new-input tokens — i.e. already aligned
+ * with Claude semantics. `cached` is the separately-billed cache-read tokens.
+ * Codex JSONL emits gross input_tokens (which includes cached_input_tokens);
+ * the loader subtracts cached before calling this so display totals don't
+ * double-count and so the cost arithmetic is straightforward.
+ */
 function computeCostUsd(opts: {
   model: string;
   input: number;
@@ -39,7 +46,7 @@ function computeCostUsd(opts: {
 }): number {
   const p = priceFor(opts.model);
   const cost =
-    (opts.input - opts.cached) * (p.input / 1_000_000) +
+    opts.input * (p.input / 1_000_000) +
     opts.cached * (p.cached / 1_000_000) +
     opts.output * (p.output / 1_000_000);
   return Math.max(0, cost);
@@ -109,9 +116,13 @@ export const loadCodexSessions: SourceLoader = async (opts) => {
     if (!p.sessionId) continue;
     if (sinceMs !== null && p.durationMs === 0) continue;
     const model = p.models[0] ?? "default";
+    // Codex JSONL emits input_tokens GROSS (already includes cached_input_tokens).
+    // Convert to Claude-style net semantics so renderers and aggregators that
+    // sum input + cacheRead don't double-count the cached portion.
+    const netInput = Math.max(0, p.inputTokens - p.cachedInputTokens);
     const totalCostUsd = computeCostUsd({
       model,
-      input: p.inputTokens,
+      input: netInput,
       cached: p.cachedInputTokens,
       output: p.outputTokens + p.reasoningOutputTokens,
     });
@@ -125,7 +136,7 @@ export const loadCodexSessions: SourceLoader = async (opts) => {
       endUtc: p.endUtc ?? new Date().toISOString(),
       durationMs: p.durationMs,
 
-      inputTokens: p.inputTokens,
+      inputTokens: netInput,
       outputTokens: p.outputTokens + p.reasoningOutputTokens,
       cacheCreateTokens: 0,
       cacheReadTokens: p.cachedInputTokens,
@@ -192,9 +203,11 @@ export const loadCodexSessions: SourceLoader = async (opts) => {
 export async function loadCodexFromFile(filePath: string): Promise<NormalizedSession> {
   const p = await extractCodexPersonality(filePath);
   const model = p.models[0] ?? "default";
+  // See loadCodexSessions for why we subtract: Codex emits gross input_tokens.
+  const netInput = Math.max(0, p.inputTokens - p.cachedInputTokens);
   const totalCostUsd = computeCostUsd({
     model,
-    input: p.inputTokens,
+    input: netInput,
     cached: p.cachedInputTokens,
     output: p.outputTokens + p.reasoningOutputTokens,
   });
@@ -208,7 +221,7 @@ export async function loadCodexFromFile(filePath: string): Promise<NormalizedSes
     endUtc: p.endUtc ?? new Date().toISOString(),
     durationMs: p.durationMs,
 
-    inputTokens: p.inputTokens,
+    inputTokens: netInput,
     outputTokens: p.outputTokens + p.reasoningOutputTokens,
     cacheCreateTokens: 0,
     cacheReadTokens: p.cachedInputTokens,
