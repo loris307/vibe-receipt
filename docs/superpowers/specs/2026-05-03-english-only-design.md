@@ -46,8 +46,23 @@ The German translation is a maintenance overhead Loris no longer wants to carry.
 ## README changes
 
 - **README.md:51** — delete "Renders as `VIBE BON` under `--lang de`." sentence inside the `VIBE RECEIPT` row.
-- **README.md:310-314** — delete the entire `## Languages` section (header + body).
-- Sweep for any other `--lang` mention and delete/rewrite. (None confirmed beyond the above two; the audit didn't surface more, but a final grep is part of the verification gate.)
+- **README.md:312-314** — delete the entire `## Languages` section. The heading is at line 312 ("## Languages"), the body sentence is at line 314, and the surrounding `---` dividers (lines 310 and 316) are kept since they bracket adjacent sections.
+- README.md:130 — the politeness row description currently says "(English + German patterns)". This is **kept as-is**: German politeness-word *detection* (`bitte`, `danke`, etc. in `src/extract/politeness.ts`) is independent of render language and stays. See "Out of scope" below.
+- Sweep `src/`, `tests/`, `README.md`, **`docs/`** for any other `--lang` / `VIBE BON` / `i18n/de` / `pickLang` mention; rewrite or delete. (Confirmed in `docs/spec.md`: lines 80, 214, 590, 759 all reference `--lang de` or `i18n/de` and must be addressed — see next bullet.)
+- **`docs/spec.md`** — this is a frozen design doc from before the German-removal decision. Update inline:
+  - Line 80: rewrite the `--lang de|en` flag-table row to remove German (or delete the row).
+  - Line 214: drop `de.ts` from the file-tree listing.
+  - Line 590: rewrite the "Localization" paragraph as English-only, or delete it.
+  - Line 759: delete the `--lang de produces an entirely German card` test-checklist item.
+
+## Verification gate (must all pass)
+
+1. `pnpm typecheck` — green.
+2. `pnpm test` — green (DE-specific tests removed; remaining tests use bare `strings`).
+3. `pnpm build` — green; `dist/cli.mjs` rebuilt.
+4. `node dist/cli.mjs --help` — output does not contain `--lang` or `de`.
+5. `grep -rn "VIBE BON\|--lang\|i18n/de\|pickLang\|de\.ts" src/ tests/ docs/ README.md` — returns zero matches. (Note: scope explicitly includes `docs/` per the docs/spec.md updates above.)
+6. Smoke render: `node dist/cli.mjs --json` against any existing session — emits a valid Receipt JSON, no errors.
 
 ## Verification gate (must all pass)
 
@@ -63,6 +78,7 @@ The German translation is a maintenance overhead Loris no longer wants to carry.
 - The 7 audit issues from the previous task (Satori license, rate-limits format, `VIBE_RECEIPT_OFFLINE`, etc.) — separate task.
 - Any refactor of the `Strings` type, the receipt schema, or the render pipeline.
 - Removing `i18n/` directory (could rename `en.ts` → `strings.ts`, but that's churn for no win — kept).
+- **`src/extract/politeness.ts`** — keeps its German + Spanish + French politeness-word regexes. These detect what the *user* typed in their prompts; they're not render-language settings. Removing them would change the `manners` stat's meaning. README.md:130's mention of "German patterns" stays accurate. (Note: the broader audit flagged that README.md:130 understates the actual coverage — that's a separate fix in the audit-issues task.)
 
 ## Rollback
 
