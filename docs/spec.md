@@ -77,7 +77,6 @@ vibe-receipt year                            # current calendar year
 --reveal paths|prompt|bash|all               # opt out of smart-redact for those fields
 --review                                     # interactive: show ANSI preview, prompt y/N before writing PNG
 --json                                       # emit the raw Receipt JSON to stdout instead of PNG
---lang de|en                                 # label language (default: en; auto-detect via $LANG)
 
 # Hook management
 vibe-receipt install-hook                    # adds SessionEnd hook to ~/.claude/settings.json (with backup)
@@ -210,8 +209,7 @@ vibe-receipt/
 │   │   └── settings-io.ts           # safe read-modify-write with .bak backup
 │   │
 │   ├── i18n/
-│   │   ├── en.ts
-│   │   └── de.ts
+│   │   └── en.ts
 │   │
 │   └── util/
 │       ├── duration.ts              # ms → "25m 24s"
@@ -585,9 +583,9 @@ Vertical rhythm: every section header is bold caps, every section body is 6–10
 
 `--size all` writes 3 PNGs.
 
-### 13.5 i18n
+### 13.5 Labels
 
-`--lang de|en` swaps section labels via `i18n/{en,de}.ts`. Defaults to `en`; if `$LANG` starts with `de_` and no flag is given, defaults to `de`. German labels: `SESSION` / `ARBEIT` / `TOP TOOLS` / `SUB-AGENTS` / `CHARAKTER` / `ERSTER PROMPT` / „dauer" / „kosten" / „dateien" / „afk" / „esc-rage" / „yolo-modus" / „tiefer gedanke".
+All section labels are English. Strings live in `src/i18n/en.ts`. (Earlier versions supported a German variant; that was removed in 2026-05.)
 
 ## 14. Render pipeline
 
@@ -756,7 +754,6 @@ Each milestone is a video.
 - [ ] `--review` interactively gates PNG write on user y/N.
 - [ ] ANSI preview renders on macOS Terminal.app, iTerm2, Warp, and Linux gnome-terminal without garbled characters.
 - [ ] Fonts bundled (no system-font fallback in PNG).
-- [ ] `--lang de` produces an entirely German card.
 - [ ] All three sizes (`portrait` / `story` / `og`) render correctly at the documented pixel dimensions.
 - [ ] Render snapshot tests pass on macOS and Linux.
 - [ ] `npm pack` ≤ 12 MB.
