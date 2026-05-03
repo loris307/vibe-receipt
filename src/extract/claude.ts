@@ -1,10 +1,10 @@
 import { glob, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
-import { readJsonlAll } from "../util/jsonl.js";
-import { extractClaudePersonality } from "./personality/claude-jsonl.js";
-import { computeClaudeCostUsd } from "./claude-pricing.js";
 import type { LoadOpts, NormalizedSession } from "../data/types.js";
+import { readJsonlAll } from "../util/jsonl.js";
+import { computeClaudeCostUsd } from "./claude-pricing.js";
+import { extractClaudePersonality } from "./personality/claude-jsonl.js";
 
 /**
  * Resolves Claude project JSONL search roots, honoring CLAUDE_CONFIG_DIR + XDG dual-default.
@@ -66,7 +66,9 @@ async function listJsonlFilesWithMtime(): Promise<{ path: string; mtimeMs: numbe
  * Normalizes a Claude personality bundle into the cross-source NormalizedSession.
  * Token/cost fields are filled by mergeWithCcusage().
  */
-function personalityToNormalized(p: Awaited<ReturnType<typeof extractClaudePersonality>>): NormalizedSession {
+function personalityToNormalized(
+  p: Awaited<ReturnType<typeof extractClaudePersonality>>,
+): NormalizedSession {
   const sessionId = p.sessionId ?? "unknown";
   return {
     source: "claude",
@@ -93,6 +95,7 @@ function personalityToNormalized(p: Awaited<ReturnType<typeof extractClaudePerso
     linesAdded: p.linesAdded,
     linesRemoved: p.linesRemoved,
     bashCommands: p.bashCommands,
+    bashCommandsList: p.bashCommandsList,
     webFetches: p.webFetches,
     userModified: p.userModified,
 
@@ -195,39 +198,54 @@ async function sumTokensInFile(filePath: string, sinceMs?: number): Promise<Toke
  * Each subagent makes its own API calls — Anthropic bills them separately, so they
  * MUST be added to the parent's cost. We don't promote subagents to standalone
  * sessions (their work is already summarized via Agent tool_use in the parent).
+ *
+ * Returns parent and subagent sums separately so the cost merge can apply ccusage
+ * (parent-only) + our pricing table (subagent) without double-counting.
  */
 async function fallbackTokenSum(
   filePath: string,
   sinceMs?: number,
-): Promise<TokenSum> {
-  const main = await sumTokensInFile(filePath, sinceMs);
+): Promise<{ parent: TokenSum; subagent: TokenSum; combined: TokenSum }> {
+  const parent = await sumTokensInFile(filePath, sinceMs);
   const parentBase = filePath.replace(/\.jsonl$/, "");
   const subagentDir = resolve(parentBase, "subagents");
-  let subInput = 0;
-  let subOutput = 0;
-  let subCreate = 0;
-  let subCreate1h = 0;
-  let subRead = 0;
+  const subagent: TokenSum = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheCreateTokens: 0,
+    cacheCreate1hTokens: 0,
+    cacheReadTokens: 0,
+  };
   try {
     for await (const file of glob("*.jsonl", { cwd: subagentDir, withFileTypes: false })) {
       const subPath = resolve(subagentDir, String(file));
       const sub = await sumTokensInFile(subPath, sinceMs);
-      subInput += sub.inputTokens;
-      subOutput += sub.outputTokens;
-      subCreate += sub.cacheCreateTokens;
-      subCreate1h += sub.cacheCreate1hTokens;
-      subRead += sub.cacheReadTokens;
+      subagent.inputTokens += sub.inputTokens;
+      subagent.outputTokens += sub.outputTokens;
+      subagent.cacheCreateTokens += sub.cacheCreateTokens;
+      subagent.cacheCreate1hTokens += sub.cacheCreate1hTokens;
+      subagent.cacheReadTokens += sub.cacheReadTokens;
     }
   } catch {
     // no subagents dir — fine
   }
-  return {
-    inputTokens: main.inputTokens + subInput,
-    outputTokens: main.outputTokens + subOutput,
-    cacheCreateTokens: main.cacheCreateTokens + subCreate,
-    cacheCreate1hTokens: main.cacheCreate1hTokens + subCreate1h,
-    cacheReadTokens: main.cacheReadTokens + subRead,
+  const combined: TokenSum = {
+    inputTokens: parent.inputTokens + subagent.inputTokens,
+    outputTokens: parent.outputTokens + subagent.outputTokens,
+    cacheCreateTokens: parent.cacheCreateTokens + subagent.cacheCreateTokens,
+    cacheCreate1hTokens: parent.cacheCreate1hTokens + subagent.cacheCreate1hTokens,
+    cacheReadTokens: parent.cacheReadTokens + subagent.cacheReadTokens,
   };
+  return { parent, subagent, combined };
+}
+
+function tokenSumIsZero(t: TokenSum): boolean {
+  return (
+    t.inputTokens === 0 &&
+    t.outputTokens === 0 &&
+    t.cacheCreateTokens === 0 &&
+    t.cacheReadTokens === 0
+  );
 }
 
 /**
@@ -245,64 +263,84 @@ async function mergeTokensAndCost(
   sinceMs?: number,
 ): Promise<NormalizedSession> {
   const fb = await fallbackTokenSum(filePath, sinceMs);
-  let inputTokens = fb.inputTokens;
-  let outputTokens = fb.outputTokens;
-  let cacheCreateTokens = fb.cacheCreateTokens;
-  let cacheCreate1hTokens = fb.cacheCreate1hTokens;
-  let cacheReadTokens = fb.cacheReadTokens;
+  // Working values default to PARENT (we may upgrade to ccusage's parent-only numbers below);
+  // subagent values are always tracked separately so cost stays correct.
+  let parentInput = fb.parent.inputTokens;
+  let parentOutput = fb.parent.outputTokens;
+  let parentCreate = fb.parent.cacheCreateTokens;
+  const parentCreate1h = fb.parent.cacheCreate1hTokens;
+  let parentRead = fb.parent.cacheReadTokens;
   let ccusageCost = 0;
 
   // ccusage's loadSessionUsageById has no time-window awareness — only call it for
   // un-clipped (whole-session) extractions; otherwise our in-window fallback is the truth.
-  if (typeof sinceMs !== "number") try {
-    const mod: any = await import("ccusage/data-loader");
-    const loadById = mod.loadSessionUsageById;
-    if (typeof loadById === "function") {
-      const data = await loadById(ns.sessionId, { mode: "auto" });
-      if (data && typeof data === "object") {
-        const ci = Number(data.inputTokens ?? data.input_tokens ?? 0);
-        const co = Number(data.outputTokens ?? data.output_tokens ?? 0);
-        const cc = Number(data.cacheCreationTokens ?? data.cache_creation_tokens ?? 0);
-        const cr = Number(data.cacheReadTokens ?? data.cache_read_tokens ?? 0);
-        const cu = Number(data.totalCost ?? data.totalCostUsd ?? data.cost ?? 0);
-        // Use ccusage tokens if non-zero (ccusage doesn't expose 5m vs 1h split,
-        // so we keep our own 1h count from the JSONL).
-        if (ci + co + cc + cr > 0) {
-          inputTokens = ci;
-          outputTokens = co;
-          cacheCreateTokens = cc;
-          cacheReadTokens = cr;
+  // ccusage only sees the parent transcript by sessionId; subagent transcripts are
+  // separate files Anthropic bills independently.
+  if (typeof sinceMs !== "number")
+    try {
+      const mod: any = await import("ccusage/data-loader");
+      const loadById = mod.loadSessionUsageById;
+      if (typeof loadById === "function") {
+        const data = await loadById(ns.sessionId, { mode: "auto" });
+        if (data && typeof data === "object") {
+          const ci = Number(data.inputTokens ?? data.input_tokens ?? 0);
+          const co = Number(data.outputTokens ?? data.output_tokens ?? 0);
+          const cc = Number(data.cacheCreationTokens ?? data.cache_creation_tokens ?? 0);
+          const cr = Number(data.cacheReadTokens ?? data.cache_read_tokens ?? 0);
+          const cu = Number(data.totalCost ?? data.totalCostUsd ?? data.cost ?? 0);
+          // ccusage doesn't expose 5m vs 1h split, so we keep our 1h count from the JSONL.
+          if (ci + co + cc + cr > 0) {
+            parentInput = ci;
+            parentOutput = co;
+            parentCreate = cc;
+            parentRead = cr;
+          }
+          if (cu > 0) ccusageCost = cu;
         }
-        if (cu > 0) ccusageCost = cu;
       }
+    } catch {
+      // ignore — use fallback values
     }
-  } catch {
-    // ignore — use fallback values
-  }
 
-  const ourCost = computeClaudeCostUsd({
+  // Cost split: parent uses ccusage (authoritative) when available; else our table.
+  // Subagents ALWAYS use our table — ccusage's per-session API never sees them, and
+  // omitting their cost was the v0.3 undercounting bug (#5 in fixes.md).
+  const parentCostFromTable = computeClaudeCostUsd({
     models: ns.models,
-    inputTokens,
-    outputTokens,
-    cacheCreateTokens,
-    cacheCreate1hTokens,
-    cacheReadTokens,
+    inputTokens: parentInput,
+    outputTokens: parentOutput,
+    cacheCreateTokens: parentCreate,
+    cacheCreate1hTokens: parentCreate1h,
+    cacheReadTokens: parentRead,
   });
-  // Prefer ccusage's authoritative cost when it returned one; else our table.
-  const totalCostUsd = ccusageCost > 0 ? ccusageCost : ourCost;
+  const parentCost = ccusageCost > 0 ? ccusageCost : parentCostFromTable;
+  const subagentCost = tokenSumIsZero(fb.subagent)
+    ? 0
+    : computeClaudeCostUsd({
+        models: ns.models,
+        inputTokens: fb.subagent.inputTokens,
+        outputTokens: fb.subagent.outputTokens,
+        cacheCreateTokens: fb.subagent.cacheCreateTokens,
+        cacheCreate1hTokens: fb.subagent.cacheCreate1hTokens,
+        cacheReadTokens: fb.subagent.cacheReadTokens,
+      });
+  const totalCostUsd = parentCost + subagentCost;
 
   return {
     ...ns,
-    inputTokens,
-    outputTokens,
-    cacheCreateTokens,
-    cacheReadTokens,
+    inputTokens: parentInput + fb.subagent.inputTokens,
+    outputTokens: parentOutput + fb.subagent.outputTokens,
+    cacheCreateTokens: parentCreate + fb.subagent.cacheCreateTokens,
+    cacheReadTokens: parentRead + fb.subagent.cacheReadTokens,
     totalCostUsd,
   };
 }
 
 function passesFilters(ns: NormalizedSession, opts: LoadOpts): boolean {
-  if (opts.sessionId && ns.sessionId !== opts.sessionId) return false;
+  // Allow short --session prefixes (README documents `vibe-receipt --session 297c7fe2`,
+  // and `history list` only shows the first 8 chars). Exact match still works because
+  // a string is a prefix of itself.
+  if (opts.sessionId && !ns.sessionId.startsWith(opts.sessionId)) return false;
   if (opts.cwd && ns.cwd !== opts.cwd) return false;
   if (opts.branch && ns.branch !== opts.branch) return false;
   if (typeof opts.sinceMs === "number") {
@@ -341,11 +379,7 @@ export const loadClaudeSessions: import("../data/types.js").SourceLoader = async
       continue;
     const ns = personalityToNormalized(personality);
     if (!passesFilters(ns, opts)) continue;
-    const merged = await mergeTokensAndCost(
-      ns,
-      path,
-      sinceMs !== null ? sinceMs : undefined,
-    );
+    const merged = await mergeTokensAndCost(ns, path, sinceMs !== null ? sinceMs : undefined);
     out.push(merged);
     if (out.length >= limit) break;
   }

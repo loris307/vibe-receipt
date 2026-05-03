@@ -1,26 +1,26 @@
-import { describe, expect, it } from "vitest";
-import { writeFile, mkdtemp } from "node:fs/promises";
+import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { extractClaudePersonality } from "../../src/extract/personality/claude-jsonl.js";
-import { scorePoliteness } from "../../src/extract/politeness.js";
+import { describe, expect, it } from "vitest";
+import { deriveAchievements } from "../../src/aggregate/achievements.js";
+import {
+  type ArchetypeFeatures,
+  pickArchetype,
+  scoreAllArchetypes,
+} from "../../src/aggregate/archetype.js";
 import {
   computeBurnRatePeak,
   computeCostPerLine,
   computeMostEditedFile,
 } from "../../src/aggregate/derive-stats.js";
-import {
-  pickArchetype,
-  scoreAllArchetypes,
-  type ArchetypeFeatures,
-} from "../../src/aggregate/archetype.js";
-import { deriveAchievements } from "../../src/aggregate/achievements.js";
 import type { Receipt } from "../../src/data/receipt-schema.js";
+import { extractClaudePersonality } from "../../src/extract/personality/claude-jsonl.js";
+import { scorePoliteness } from "../../src/extract/politeness.js";
 
 async function makeFixture(events: unknown[]): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "vibe-receipt-test-"));
   const path = join(dir, "session.jsonl");
-  await writeFile(path, events.map((e) => JSON.stringify(e)).join("\n") + "\n");
+  await writeFile(path, `${events.map((e) => JSON.stringify(e)).join("\n")}\n`);
   return path;
 }
 
@@ -76,7 +76,7 @@ describe("longest solo-stretch", () => {
     const path = await makeFixture([
       userEvent("2026-01-01T00:00:00Z", "first"),
       userEvent("2026-01-01T00:01:00Z", "second"), // 1 min gap
-      userEvent("2026-01-01T00:06:00Z", "third"),  // 5 min gap (peak)
+      userEvent("2026-01-01T00:06:00Z", "third"), // 5 min gap (peak)
       userEvent("2026-01-01T00:08:00Z", "fourth"), // 2 min gap
     ]);
     const p = await extractClaudePersonality(path);
@@ -144,7 +144,7 @@ describe("politeness scoring", () => {
     expect(scorePoliteness(["thanks-test.ts uses handleSorry()"])).toEqual({
       please: 0,
       thanks: 1, // thanks-test still matches "thanks" — that's actually OK by spec, word-boundary on hyphen
-      sorry: 0,  // handleSorry has no boundary before "Sorry"
+      sorry: 0, // handleSorry has no boundary before "Sorry"
     });
   });
 
@@ -486,6 +486,9 @@ function makeReceipt(over: Partial<Receipt> = {}): Receipt {
       longestSoloStretchMs: 0,
       longestSoloStretchStartUtc: null,
       longestSoloStretchEndUtc: null,
+      compactionCount: 0,
+      firstCompactPreTokens: null,
+      firstCompactContextPct: null,
     },
     cost: {
       totalUsd: 0,
@@ -511,7 +514,7 @@ function makeReceipt(over: Partial<Receipt> = {}): Receipt {
       userModified: 0,
       mostEditedFile: null,
     },
-    tools: { total: 0, top: [] },
+    tools: { total: 0, top: [], mcpServers: [], sidechainEvents: 0 },
     subagents: [],
     personality: {
       escInterrupts: 0,
@@ -530,6 +533,8 @@ function makeReceipt(over: Partial<Receipt> = {}): Receipt {
       shortestPromptText: null,
       waitThenGoCount: 0,
       politenessScore: { please: 0, thanks: 0, sorry: 0, total: 0 },
+      correctionCount: 0,
+      correctionRate: 0,
     },
     firstPrompt: {
       wordCount: 0,
@@ -606,14 +611,14 @@ describe("achievement badges", () => {
   it("triggers no-error-streak ONLY when zero rate-limits, zero ESCs, >30min, and engagement", () => {
     const r = makeReceipt({
       time: { ...makeReceipt().time, durationMs: 45 * 60_000, startUtc: "2026-05-02T14:00:00Z" },
-      tools: { total: 5, top: [] },
+      tools: { total: 5, top: [], mcpServers: [], sidechainEvents: 0 },
     });
     const a = deriveAchievements(r);
     expect(a.map((x) => x.key)).toContain("no-error-streak");
 
     const r2 = makeReceipt({
       time: { ...makeReceipt().time, durationMs: 45 * 60_000, startUtc: "2026-05-02T14:00:00Z" },
-      tools: { total: 5, top: [] },
+      tools: { total: 5, top: [], mcpServers: [], sidechainEvents: 0 },
       cost: { ...makeReceipt().cost, rateLimitHits: 1 },
     });
     expect(deriveAchievements(r2).map((x) => x.key)).not.toContain("no-error-streak");

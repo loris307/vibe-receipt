@@ -10,7 +10,8 @@
       },
       "style": {
         "useNodejsImportProtocol": "error",
-        "useImportType": "off"
+        "useImportType": "off",
+        "noNonNullAssertion": "off"
       },
       "correctness": {
         "noUnusedVariables": "warn",

@@ -1,26 +1,34 @@
 import { glob, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
-import { extractCodexPersonality } from "./personality/codex-jsonl.js";
 import type { LoadOpts, NormalizedSession, SourceLoader } from "../data/types.js";
+import { extractCodexPersonality } from "./personality/codex-jsonl.js";
 
 /**
  * Hardcoded fallback prices per million tokens (USD). Targets common Codex / GPT-5 models.
  * Refreshed as needed. (TODO v1.1: share LiteLLM pricing fetch with ccusage.)
  */
 const CODEX_PRICES_PER_MTOK: Record<string, { input: number; cached: number; output: number }> = {
+  "gpt-5.5": { input: 1.25, cached: 0.125, output: 10.0 },
+  "gpt-5.5-codex": { input: 1.25, cached: 0.125, output: 10.0 },
   "gpt-5.3-codex": { input: 1.25, cached: 0.125, output: 10.0 },
   "gpt-5.2-codex": { input: 1.0, cached: 0.1, output: 8.0 },
   "gpt-5.1-codex": { input: 1.0, cached: 0.1, output: 8.0 },
   "gpt-5-codex": { input: 1.0, cached: 0.1, output: 8.0 },
+  "gpt-5": { input: 1.25, cached: 0.125, output: 10.0 },
   "o4-mini": { input: 1.1, cached: 0.275, output: 4.4 },
-  "o4": { input: 5.0, cached: 1.25, output: 20.0 },
+  o4: { input: 5.0, cached: 1.25, output: 20.0 },
   "o3-mini": { input: 1.1, cached: 0.55, output: 4.4 },
   default: { input: 1.0, cached: 0.1, output: 8.0 },
 };
 
 function priceFor(model: string) {
-  return CODEX_PRICES_PER_MTOK[model] ?? CODEX_PRICES_PER_MTOK.default!;
+  if (CODEX_PRICES_PER_MTOK[model]) return CODEX_PRICES_PER_MTOK[model]!;
+  // Prefix fallback for gpt-5.X minor revisions LiteLLM hasn't picked up yet.
+  if (/^gpt-5(\.\d+)?(-codex)?$/.test(model)) {
+    return CODEX_PRICES_PER_MTOK["gpt-5"]!;
+  }
+  return CODEX_PRICES_PER_MTOK.default!;
 }
 
 function computeCostUsd(opts: {
@@ -64,8 +72,12 @@ async function listJsonlFilesWithMtime(): Promise<{ path: string; mtimeMs: numbe
 }
 
 function passesFilters(ns: NormalizedSession, opts: LoadOpts): boolean {
-  if (opts.sessionId && ns.sessionId !== opts.sessionId) return false;
+  // Allow short --session prefixes (see Claude loader for rationale).
+  if (opts.sessionId && !ns.sessionId.startsWith(opts.sessionId)) return false;
   if (opts.cwd && ns.cwd !== opts.cwd) return false;
+  // Codex sessions don't carry a git branch (ns.branch is always null), so any
+  // explicit --branch filter must reject them rather than silently passing.
+  if (opts.branch && ns.branch !== opts.branch) return false;
   if (typeof opts.sinceMs === "number") {
     const end = new Date(ns.endUtc).getTime();
     if (!Number.isFinite(end) || end < opts.sinceMs) return false;
@@ -128,6 +140,7 @@ export const loadCodexSessions: SourceLoader = async (opts) => {
       linesAdded: p.linesAdded,
       linesRemoved: p.linesRemoved,
       bashCommands: p.bashCommands,
+      bashCommandsList: p.bashCommandsList,
       webFetches: 0,
       userModified: 0,
 
@@ -210,6 +223,7 @@ export async function loadCodexFromFile(filePath: string): Promise<NormalizedSes
     linesAdded: p.linesAdded,
     linesRemoved: p.linesRemoved,
     bashCommands: p.bashCommands,
+    bashCommandsList: p.bashCommandsList,
     webFetches: 0,
     userModified: 0,
 

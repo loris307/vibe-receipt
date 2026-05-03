@@ -1,9 +1,6 @@
 import type { Receipt } from "../data/receipt-schema.js";
-import {
-  HISTORY_SCHEMA_VERSION,
-  type SessionHistoryEntry,
-} from "./types.js";
 import { isHistoryDisabled, writeHistoryEntry } from "./store.js";
+import { HISTORY_SCHEMA_VERSION, type SessionHistoryEntry } from "./types.js";
 
 /**
  * Build a SessionHistoryEntry from a receipt. The receipt is already-redacted

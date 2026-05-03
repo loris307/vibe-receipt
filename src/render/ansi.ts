@@ -81,9 +81,7 @@ export function renderAnsi(receipt: Receipt, s: Strings): string {
   if (receipt.time.longestSoloStretchMs > 60_000)
     lines.push(row(s.labelLongestSolo, formatDurationMs(receipt.time.longestSoloStretchMs)));
   if (receipt.cost.burnRatePeakTokensPerMin > 0)
-    lines.push(
-      row(s.labelPeakBurn, `${compactNumber(receipt.cost.burnRatePeakTokensPerMin)}/min`),
-    );
+    lines.push(row(s.labelPeakBurn, `${compactNumber(receipt.cost.burnRatePeakTokensPerMin)}/min`));
   if (receipt.cost.rateLimitHits > 0)
     lines.push(
       row(
@@ -115,7 +113,7 @@ export function renderAnsi(receipt: Receipt, s: Strings): string {
   }
   if (receipt.comparison?.vsLast7Days) {
     const w = receipt.comparison.vsLast7Days;
-    const lq = w.longestSessionInWindow ? "  " + s.labelLongestThisWeek : "";
+    const lq = w.longestSessionInWindow ? `  ${s.labelLongestThisWeek}` : "";
     lines.push(
       chalk.italic(
         chalk.dim(`  ${s.labelRankWeek}: ${w.tokensRankInWindow}/${w.sessionsInWindow}${lq}`),
@@ -155,7 +153,7 @@ export function renderAnsi(receipt: Receipt, s: Strings): string {
     for (const t of receipt.tools.top.slice(0, 5)) {
       const barLen = Math.round((t.count / max) * 24);
       const bar = gradientText("█".repeat(Math.max(1, barLen)));
-      lines.push(`  ${chalk.bold(t.name.padEnd(8, " "))} ${bar}  ${chalk.bold(t.count + "×")}`);
+      lines.push(`  ${chalk.bold(t.name.padEnd(8, " "))} ${bar}  ${chalk.bold(`${t.count}×`)}`);
     }
     if (receipt.tools.sidechainEvents > 0) {
       lines.push(
@@ -171,7 +169,10 @@ export function renderAnsi(receipt: Receipt, s: Strings): string {
     lines.push(row(s.labelMcpServers, String(receipt.tools.mcpServers.length)));
     for (const m of receipt.tools.mcpServers.slice(0, 5)) {
       lines.push(
-        row(m.name, `${m.callCount}× · ${m.toolCount} tool${m.toolCount === 1 ? "" : "s"}`),
+        row(
+          m.name,
+          `${m.callCount}× · ${m.toolCount} ${m.toolCount === 1 ? s.unitTool : s.unitTools}`,
+        ),
       );
     }
     lines.push(divider());
@@ -218,7 +219,7 @@ export function renderAnsi(receipt: Receipt, s: Strings): string {
     lines.push(
       row(
         s.labelManners,
-        `${ps.please}× please · ${ps.thanks}× thanks${ps.sorry > 0 ? ` · ${ps.sorry}× sorry` : ""}`,
+        `${ps.please}× ${s.politenessPlease} · ${ps.thanks}× ${s.politenessThanks}${ps.sorry > 0 ? ` · ${ps.sorry}× ${s.politenessSorry}` : ""}`,
       ),
     );
   }
@@ -237,8 +238,10 @@ export function renderAnsi(receipt: Receipt, s: Strings): string {
   lines.push(sectionHeader(s.sectionFirstPrompt));
   if (receipt.personality.promptCount > 0) {
     lines.push(row(s.labelPrompts, String(receipt.personality.promptCount)));
-    lines.push(row(s.labelLongestPrompt, `${receipt.personality.longestPromptChars} chars`));
-    lines.push(row(s.labelAvgPrompt, `${receipt.personality.avgPromptChars} chars`));
+    lines.push(
+      row(s.labelLongestPrompt, `${receipt.personality.longestPromptChars} ${s.unitChars}`),
+    );
+    lines.push(row(s.labelAvgPrompt, `${receipt.personality.avgPromptChars} ${s.unitChars}`));
   }
   const firstShown = receipt.firstPrompt.revealed ?? receipt.firstPrompt.preview;
   if (firstShown) {
@@ -248,7 +251,7 @@ export function renderAnsi(receipt: Receipt, s: Strings): string {
   if (receipt.personality.shortestPromptText) {
     const txt = receipt.personality.shortestPromptText.replace(/\s+/g, " ").trim().slice(0, 80);
     lines.push(
-      `  ${chalk.dim(s.labelShortestText.padEnd(10))} "${txt}" (${receipt.personality.shortestPromptChars} chars)`,
+      `  ${chalk.dim(s.labelShortestText.padEnd(10))} "${txt}" (${receipt.personality.shortestPromptChars} ${s.unitChars})`,
     );
   }
   lines.push(
@@ -260,11 +263,10 @@ export function renderAnsi(receipt: Receipt, s: Strings): string {
     lines.push("");
     lines.push(sectionHeader(s.sectionBadges));
     const labels = receipt.achievements.map((a) => {
-      const labelKey = ("achievement" +
-        a.key
-          .split("-")
-          .map((p) => p[0]!.toUpperCase() + p.slice(1))
-          .join("")) as keyof Strings;
+      const labelKey = `achievement${a.key
+        .split("-")
+        .map((p) => p[0]!.toUpperCase() + p.slice(1))
+        .join("")}` as keyof Strings;
       const label = (s[labelKey] as string) ?? a.key;
       return `${a.iconGlyph} ${chalk.bold(label)}`;
     });
@@ -274,12 +276,10 @@ export function renderAnsi(receipt: Receipt, s: Strings): string {
   // ARCHETYPE stamp
   {
     const ak = receipt.archetype.key;
-    const nameKey = ("arch" +
-      ak
-        .split("-")
-        .map((p) => p[0]!.toUpperCase() + p.slice(1))
-        .join("") +
-      "Name") as keyof Strings;
+    const nameKey = `arch${ak
+      .split("-")
+      .map((p) => p[0]!.toUpperCase() + p.slice(1))
+      .join("")}Name` as keyof Strings;
     const name = (s[nameKey] as string) ?? ak.toUpperCase();
     lines.push("");
     lines.push(`        ${chalk.bold(gradientText(`[ ${name} ]`))}`);

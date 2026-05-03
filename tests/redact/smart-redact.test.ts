@@ -1,12 +1,8 @@
-import { describe, expect, it } from "vitest";
 import { resolve } from "node:path";
-import { loadClaudeFromFile } from "../../src/extract/claude.js";
+import { describe, expect, it } from "vitest";
 import { buildSingleReceipt } from "../../src/aggregate/single.js";
-import {
-  applyRedaction,
-  parseRevealFlag,
-  withRawPrompt,
-} from "../../src/redact/smart-redact.js";
+import { loadClaudeFromFile } from "../../src/extract/claude.js";
+import { applyRedaction, parseRevealFlag, withRawPrompt } from "../../src/redact/smart-redact.js";
 
 const SHORT = resolve(__dirname, "../fixtures/claude/short-session.jsonl");
 
@@ -59,6 +55,33 @@ describe("applyRedaction (default = redact everything)", () => {
     expect(r.firstPrompt.revealed).toBe(null);
     expect(r.firstPrompt.fingerprintSha).toMatch(/^[0-9a-f]{6}$/);
     expect(r.firstPrompt.wordCount).toBeGreaterThan(0);
+  });
+
+  it("hides firstPrompt.preview by default", async () => {
+    const ns = await loadClaudeFromFile(SHORT);
+    const r = applyRedaction(buildSingleReceipt(ns));
+    expect(r.firstPrompt.preview).toBe(null);
+    expect(r.firstPrompt.fingerprintSha).toMatch(/^[0-9a-f]{6}$/);
+  });
+
+  it("hides personality.shortestPromptText by default", async () => {
+    const ns = await loadClaudeFromFile(SHORT);
+    const r = applyRedaction(buildSingleReceipt(ns));
+    expect(r.personality.shortestPromptText).toBe(null);
+  });
+
+  it("reveal=prompt surfaces firstPrompt.preview", async () => {
+    const ns = await loadClaudeFromFile(SHORT);
+    const r = applyRedaction(buildSingleReceipt(ns), parseRevealFlag("prompt"));
+    expect(r.firstPrompt.preview).toBeTruthy();
+  });
+
+  it("reveal=prompt surfaces shortestPromptText", async () => {
+    const ns = await loadClaudeFromFile(SHORT);
+    const r = applyRedaction(buildSingleReceipt(ns), parseRevealFlag("prompt"));
+    if (ns.shortestPromptText !== null) {
+      expect(r.personality.shortestPromptText).toBe(ns.shortestPromptText);
+    }
   });
 });
 

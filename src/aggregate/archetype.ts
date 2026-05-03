@@ -4,7 +4,8 @@ import type { NormalizedSession } from "../data/types.js";
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
 
 const FIXER_RE = /\b(fix|bug|broken|error|fail(?:ed|ing)?|crash|wrong|hak)/giu;
-const FILE_PATH_RE = /(?:\/[\w.-]+){2,}|[A-Za-z][\w.-]+\/[\w./-]+|\b[\w.-]+\.(?:ts|tsx|js|jsx|py|rs|go|java|cs|cpp|c|md|json|yml|yaml|toml|sh|sql)\b/g;
+const FILE_PATH_RE =
+  /(?:\/[\w.-]+){2,}|[A-Za-z][\w.-]+\/[\w./-]+|\b[\w.-]+\.(?:ts|tsx|js|jsx|py|rs|go|java|cs|cpp|c|md|json|yml|yaml|toml|sh|sql)\b/g;
 const CODE_BLOCK_RE = /```/g;
 
 function ratio(part: number, total: number): number {
@@ -33,14 +34,11 @@ export interface ArchetypeFeatures {
   startHourLocal: number; // 0..23
 }
 
-export function extractFeatures(
-  r: Receipt,
-  ns: NormalizedSession,
-): ArchetypeFeatures {
+export function extractFeatures(r: Receipt, ns: NormalizedSession): ArchetypeFeatures {
   const prompts = ns.promptTexts ?? [];
-  let pPath = 0,
-    pCode = 0,
-    pBug = 0;
+  let pPath = 0;
+  let pCode = 0;
+  let pBug = 0;
   for (const t of prompts) {
     if (typeof t !== "string") continue;
     if (countMatches(t, FILE_PATH_RE) > 0) pPath++;
@@ -53,7 +51,7 @@ export function extractFeatures(
   // UTC-based hour for deterministic archetype assignment regardless of
   // which machine renders the receipt. The header also displays UTC time,
   // so this stays consistent.
-  const utcHour = parseInt(r.time.startUtc.slice(11, 13), 10);
+  const utcHour = Number.parseInt(r.time.startUtc.slice(11, 13), 10);
   return {
     promptCount: r.personality.promptCount,
     avgPromptChars: r.personality.avgPromptChars,

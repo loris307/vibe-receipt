@@ -1,12 +1,12 @@
-import { describe, expect, it } from "vitest";
 import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+import { buildCombinedReceipt } from "../../src/aggregate/combine.js";
 import { promptStatsOf } from "../../src/aggregate/prompt-stats.js";
-import { extractClaudePersonality } from "../../src/extract/personality/claude-jsonl.js";
-import { extractCodexPersonality } from "../../src/extract/personality/codex-jsonl.js";
+import { buildSingleReceipt } from "../../src/aggregate/single.js";
 import { loadClaudeFromFile } from "../../src/extract/claude.js";
 import { loadCodexFromFile } from "../../src/extract/codex.js";
-import { buildSingleReceipt } from "../../src/aggregate/single.js";
-import { buildCombinedReceipt } from "../../src/aggregate/combine.js";
+import { extractClaudePersonality } from "../../src/extract/personality/claude-jsonl.js";
+import { extractCodexPersonality } from "../../src/extract/personality/codex-jsonl.js";
 
 const SHORT = resolve(__dirname, "../fixtures/claude/short-session.jsonl");
 const MULTI = resolve(__dirname, "../fixtures/claude/multi-model.jsonl");
@@ -111,18 +111,13 @@ describe("Receipt: prompt stats land on personality block", () => {
   it("buildCombinedReceipt aggregates promptLengths across sessions and picks min shortest", async () => {
     const claude = await loadClaudeFromFile(SHORT); // 1 prompt, ~73 chars
     const codex = await loadCodexFromFile(CODEX); //   1 prompt, ~34 chars
-    const r = buildCombinedReceipt(
-      [claude, codex],
-      { kind: "combine-since", since: "PT1H" },
-    );
+    const r = buildCombinedReceipt([claude, codex], { kind: "combine-since", since: "PT1H" });
     expect(r.personality.promptCount).toBe(2);
     expect(r.personality.longestPromptChars).toBeGreaterThan(60);
     expect(r.personality.shortestPromptChars).toBeGreaterThan(20);
     expect(r.personality.shortestPromptChars).toBeLessThan(40);
     expect(r.personality.avgPromptChars).toBe(
-      Math.round(
-        (r.personality.longestPromptChars + r.personality.shortestPromptChars) / 2,
-      ),
+      Math.round((r.personality.longestPromptChars + r.personality.shortestPromptChars) / 2),
     );
     // shortest text comes from the codex session
     expect(r.personality.shortestPromptText).toContain("CSV helper");

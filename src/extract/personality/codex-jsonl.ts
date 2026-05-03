@@ -1,7 +1,7 @@
-import { readJsonlAll } from "../../util/jsonl.js";
 import type { Subagent, TopFile } from "../../data/receipt-schema.js";
-import { scorePoliteness } from "../politeness.js";
+import { readJsonlAll } from "../../util/jsonl.js";
 import { countCorrections } from "../corrections.js";
+import { scorePoliteness } from "../politeness.js";
 
 /**
  * Codex CLI JSONL → personality bundle.
@@ -26,6 +26,8 @@ export interface CodexPersonality {
   linesAdded: number;
   linesRemoved: number;
   bashCommands: number;
+  /** Captured Bash command strings (parsed from function_call arguments.cmd). */
+  bashCommandsList: string[];
 
   toolCounts: Record<string, number>;
   subagents: Subagent[];
@@ -131,6 +133,7 @@ export async function extractCodexPersonality(
     linesAdded: 0,
     linesRemoved: 0,
     bashCommands: 0,
+    bashCommandsList: [],
     toolCounts: {},
     subagents: [],
     thinkingMs: 0,
@@ -200,12 +203,13 @@ export async function extractCodexPersonality(
 
     if (type === "response_item") {
       const innerType = payload.type;
+      // Old fixture shape: response_item/user_message with payload.text
+      // (kept for fixture/back-compat — current Codex emits event_msg/user_message instead)
       if (innerType === "user_message" && typeof payload.text === "string") {
         const text = payload.text.trim();
         if (text.length > 0) {
           out.promptLengths.push(text.length);
           out.promptTexts.push(text);
-          // Codex events nest timestamp under payload or at top-level
           const tsStr =
             typeof payload.timestamp === "string"
               ? payload.timestamp
@@ -215,10 +219,7 @@ export async function extractCodexPersonality(
           out.promptTimestamps.push(tsStr);
           if (!out.firstPrompt) out.firstPrompt = text;
           if (text.length > out.longestUserMsgChars) out.longestUserMsgChars = text.length;
-          if (
-            out.shortestPromptText === null ||
-            text.length < out.shortestPromptText.length
-          ) {
+          if (out.shortestPromptText === null || text.length < out.shortestPromptText.length) {
             out.shortestPromptText = text;
           }
         }
@@ -226,7 +227,30 @@ export async function extractCodexPersonality(
         const name = String(payload.name ?? "");
         if (!name) continue;
         out.toolCounts[name] = (out.toolCounts[name] ?? 0) + 1;
-        if (name === "shell") out.bashCommands += 1;
+        // shell: legacy fixture name. exec_command / local_shell_call: current Codex.
+        if (name === "shell" || name === "exec_command" || name === "local_shell_call") {
+          out.bashCommands += 1;
+          // Capture the actual command line. Codex stringifies args; parse and pull cmd.
+          if (out.bashCommandsList.length < 50) {
+            let cmd: string | null = null;
+            const args = payload.arguments;
+            if (typeof args === "string") {
+              try {
+                const parsed = JSON.parse(args);
+                if (typeof parsed?.cmd === "string") cmd = parsed.cmd;
+                else if (typeof parsed?.command === "string") cmd = parsed.command;
+                else if (Array.isArray(parsed?.command)) cmd = parsed.command.join(" ");
+              } catch {
+                // ignore
+              }
+            } else if (args && typeof args === "object") {
+              if (typeof (args as any).cmd === "string") cmd = (args as any).cmd;
+              else if (typeof (args as any).command === "string") cmd = (args as any).command;
+              else if (Array.isArray((args as any).command)) cmd = (args as any).command.join(" ");
+            }
+            if (cmd) out.bashCommandsList.push(cmd);
+          }
+        }
         if (name === "apply_patch") {
           let parsed: any = payload.arguments;
           if (typeof parsed === "string") {
@@ -265,12 +289,41 @@ export async function extractCodexPersonality(
     if (type === "event_msg") {
       const innerType = payload.type;
       if (innerType === "token_count") {
-        lastInput = Number(payload.input_tokens ?? lastInput);
-        lastCachedInput = Number(payload.cached_input_tokens ?? lastCachedInput);
-        lastOutput = Number(payload.output_tokens ?? lastOutput);
-        lastReasoning = Number(payload.reasoning_output_tokens ?? lastReasoning);
+        // Current Codex (>= ~0.125): cumulative totals nested under payload.info.total_token_usage.
+        // Legacy fixture shape: top-level payload.input_tokens etc.
+        const info = payload.info;
+        const tot =
+          info && typeof info === "object" && info.total_token_usage
+            ? info.total_token_usage
+            : info && typeof info === "object" && info.last_token_usage
+              ? info.last_token_usage
+              : null;
+        if (tot && typeof tot === "object") {
+          lastInput = Number(tot.input_tokens ?? lastInput);
+          lastCachedInput = Number(tot.cached_input_tokens ?? lastCachedInput);
+          lastOutput = Number(tot.output_tokens ?? lastOutput);
+          lastReasoning = Number(tot.reasoning_output_tokens ?? lastReasoning);
+        } else {
+          lastInput = Number(payload.input_tokens ?? lastInput);
+          lastCachedInput = Number(payload.cached_input_tokens ?? lastCachedInput);
+          lastOutput = Number(payload.output_tokens ?? lastOutput);
+          lastReasoning = Number(payload.reasoning_output_tokens ?? lastReasoning);
+        }
+      } else if (innerType === "user_message" && typeof payload.message === "string") {
+        // Current Codex shape: real user prompt is event_msg/user_message with payload.message.
+        const text = payload.message.trim();
+        if (text.length > 0) {
+          out.promptLengths.push(text.length);
+          out.promptTexts.push(text);
+          const tsStr = typeof evt.timestamp === "string" ? evt.timestamp : "";
+          out.promptTimestamps.push(tsStr);
+          if (!out.firstPrompt) out.firstPrompt = text;
+          if (text.length > out.longestUserMsgChars) out.longestUserMsgChars = text.length;
+          if (out.shortestPromptText === null || text.length < out.shortestPromptText.length) {
+            out.shortestPromptText = text;
+          }
+        }
       }
-      continue;
     }
   }
 
@@ -315,9 +368,7 @@ export async function extractCodexPersonality(
 
   // v0.2 — longest solo-stretch
   if (out.promptTimestamps.length >= 2) {
-    const tss = out.promptTimestamps
-      .map((s) => Date.parse(s))
-      .filter((n) => Number.isFinite(n));
+    const tss = out.promptTimestamps.map((s) => Date.parse(s)).filter((n) => Number.isFinite(n));
     tss.sort((a, b) => a - b);
     let maxGap = 0;
     let maxStart: number | null = null;

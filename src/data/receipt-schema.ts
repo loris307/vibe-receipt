@@ -158,6 +158,9 @@ export const ReceiptSchema = v.object({
     linesAdded: v.number(),
     linesRemoved: v.number(),
     bashCommands: v.number(),
+    /** Captured Bash command lines, capped at 50. Null when redacted (default).
+     *  Surface with `--reveal=bash`. */
+    bashCommandsList: v.optional(v.nullable(v.array(v.string()))),
     webFetches: v.number(),
     userModified: v.number(),
     mostEditedFile: v.nullable(MostEditedFileSchema),

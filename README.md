@@ -4,7 +4,7 @@
 > Tokens, cost, files touched, deep-thought time, ESC-rage — all in a screenshot you can actually share.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![status](https://img.shields.io/badge/status-v0.1.0-orange)
+![status](https://img.shields.io/badge/status-v0.3.0-orange)
 ![tested-against](https://img.shields.io/badge/tested-Claude%20Code%20%2B%20Codex%20CLI-blueviolet)
 
 <p align="center">
@@ -42,44 +42,163 @@ That's it. You'll see a terminal preview, and a PNG saved to `./vibe-receipts/<s
 
 ## What you get
 
-After a session, the receipt summarizes:
+The receipt is laid out in fixed sections. Every stat below is rendered exactly as the label appears on the PNG. Rows that depend on a threshold are noted. The OG (1200×630) preset skips the heavier sections by design — `OG-skipped` is noted per-row or per-section where it applies.
 
-| Section | Stats |
+### Header
+
+| Stat | Explanation |
 |---|---|
-| **SESSION** | duration · model · total tokens · cost (USD) · cache-hit ratio · longest solo-stretch · peak burn rate · rate-limit hits · vs last session · vs last 7 days |
-| **WORK** | files touched · lines added/removed · bash commands · web fetches · most-edited single file · $/line shipped |
-| **TOP TOOLS** | bar chart of your 5 most-used tools (Edit, Bash, Read, Skill, Agent, …) |
-| **SUBAGENTS** | count · total time · total tokens · total tool calls |
-| **PERSONALITY** | afk · ESC-rage · permission flips · YOLO mode · deep thought time · skills · slash commands · wait-then-go · manners (please/thanks/sorry) |
-| **PROMPTING** | total prompts · longest/shortest/avg length · first-prompt preview · shortest prompt full text |
-| **BADGES** | up to 3 rarity-ordered achievements (token-millionaire 🏆, big-spender 💸, marathoner 🏃, auto-pilot 🤝, deep-thinker 🧠, no-error-streak 🔥, sprinter ⚡, toolbox-master 🛠, night-owl 🌙, researcher 📚, bug-hunter 🐛, polite 🙏) |
-| **ARCHETYPE** | one of 8 personas stamped at the foot — The Specifier · The Vibe-Coder · The Fixer · The Researcher · The Firefighter · The Trustfall Pilot · The ESC-Rager · The Night Owl |
+| `VIBE RECEIPT` | Masthead at the top. Renders as `VIBE BON` under `--lang de`. |
+| `monospace receipt` | Tagline below the masthead. |
+| `· in flight` | Appended to the tagline when the session is still running. |
+| `session` / `combined · N` / `today` / `this week` / `year YYYY` | Mode badge in the top-right corner. Reflects whether you ran `show`, `combine`, `today`, `week`, or `year`. |
+| `YYYY-MM-DD · HH:MM:SS → HH:MM:SS` | Start date and UTC start → end time of the session window. |
+| `<project>  @  <branch>  ·  <sources>` | Project name (basename of cwd by default; full path with `--reveal=paths`), git branch, and which sources contributed (`claude`, `codex`, or `claude+codex`). |
 
-### v0.3: deeper session signals
+### SESSION
 
-Four new stats land on the card when the data is there (silently skipped otherwise):
+| Stat | Explanation |
+|---|---|
+| `duration` | Wall-clock duration of the session (start → end). Single-session mode only. |
+| `sessions` | Number of merged sessions. Combine/window modes only. |
+| `wall window` | Earliest start → latest end across all merged sessions. Combine/window modes only. |
+| `active time` | Sum of model-active time from `turn_duration` events. Can exceed `wall window` when parallel sessions overlap — by design. |
+| `model` | Primary model used in the session (e.g. `claude-opus-4-7`, `gpt-5.5`). |
+| `tokens` | Total tokens (input + output + cache_create + cache_read), formatted compactly (`7.2M`, `483k`). |
+| `cost` | Estimated USD cost. Claude uses `ccusage` plus a bundled fallback table; Codex uses a local pricing table. Subagent cost is added on top of parent. |
+| `cache hit` | `cache_read / (input + cache_create + cache_read)` as a percentage — how much of the prompt was served from prompt-cache. |
+| `longest solo` | Longest gap between two consecutive real user prompts (i.e. how long Claude/Codex worked alone). Shown only when > 1 minute. |
+| `peak burn` | Token-per-minute peak in a rolling 60-second window. Shown only when > 0. |
+| `rate limits` | `× N · wait` — number of HTTP 429 / `rate_limit_error` events plus the summed `retry-after`. Shown only when > 0. |
+| `compactions` | `× N · first @ X% ctx` — times `/compact` triggered and what fraction of the model's context window was filled at the first squeeze. Shown only when > 0. OG-skipped. |
+| `vs last` | Italic comparison line: `±X% tok · ±Y% $` versus the previous session of the same source from `~/.vibe-receipt/history.jsonl`. |
+| `week rank` | Italic comparison line: `N/M  🏆 longest of last 7 days` — your current session's token rank within the rolling 7-day window. |
 
-| Stat | Where | What it shows |
-|---|---|---|
-| **compactions × N · first @ X% ctx** | SESSION | Times you hit `/compact`, plus the context-window percentage at the first squeeze |
-| **MCP servers** | dedicated MCP section (≥2 servers) or single-row line (1 server) | Which MCP servers you used and which got hammered most |
-| **side branches: N×** | TOP TOOLS fine-print | Count of `isSidechain:true` events (raw signal — useful when subagents/`/btw` are active) |
-| **corrections × N · X% of prompts** | PERSONALITY | Approximate self-corrections in your prompts ("Nein, ich meinte…", "no, use X instead") — EN + DE patterns |
+### WORK
 
-OG (1200×630) stays minimal-by-design and skips the v0.3 rows; portrait + story auto-extend to fit.
+| Stat | Explanation |
+|---|---|
+| `files touched` | Number of distinct file paths that were edited or created. |
+| `lines added` | Sum of `+` lines across every `structuredPatch` hunk (Edit/Write/MultiEdit tool results). |
+| `lines removed` | Sum of `-` lines across the same patches. |
+| `bash commands` | Number of Bash tool calls (Claude `Bash`, Codex `exec_command` / `shell` / `local_shell_call`). With `--reveal=bash` the actual command lines are surfaced as a `bashCommandsList` (capped at 50). |
+| `web fetches` | Number of `WebFetch` tool calls. Shown only when > 0. |
+| `most edited` | `<file> · N× · +A/−R` — the single file with the most edit events (≥3 edits required), plus its total +/- line count. |
+| `$/line` | Cost-per-net-line shipped: `totalUsd / max(0, linesAdded − linesRemoved)`, formatted to 4 decimal places. Shown only when > 0. |
 
-### v0.2: persistent history & comparisons
+### TOP TOOLS
 
-`vibe-receipt` now keeps a local `~/.vibe-receipt/history.jsonl` (one row per render, redacted, idempotent). Inspect or wipe it:
+| Stat | Explanation |
+|---|---|
+| Tool bars | Top 5 tools by call count, rendered as a horizontal gradient bar chart (`Edit ████ 142×`). |
+| `side branches` | Italic fine-print: `N×` count of events with `isSidechain: true` (subagent / `/btw` branch dispatches). Shown only when > 0. OG-skipped. |
+
+### MCP
+
+Shown only when at least one MCP server was used. With one server the receipt shows a compact single line; with two or more it renders as its own section. OG-skipped.
+
+| Stat | Explanation |
+|---|---|
+| `MCP servers` | Total count of distinct MCP servers used in the session. |
+| `top: <name> (N×)` | Single-server fallback line — server name and total call count. |
+| `<server>` row | Per-server: `N× · M tools` — call count and number of distinct tool names invoked on that server. |
+
+### SUBAGENTS
+
+Shown only when at least one subagent was dispatched. OG-skipped.
+
+| Stat | Explanation |
+|---|---|
+| `count` | Number of subagent dispatches in this session. |
+| `total time` | Sum of `totalDurationMs` across all subagents. |
+| `total tokens` | Sum of `totalTokens` across all subagents. |
+| `total tool uses` | Sum of `totalToolUseCount` across all subagents. |
+
+### PERSONALITY
+
+Each row is shown only when its underlying value is non-trivial (typically > 0; `afk` and `deep thought` require > 1 second).
+
+| Stat | Explanation |
+|---|---|
+| `afk` | `durationMs − activeMs` — time the user was away (model idle waiting for input). |
+| `esc-rage` | Number of ESC interrupts (tool results with `interrupted: true`). |
+| `permission flips` | Count of `type: permission-mode` events (the user toggled permission mode). |
+| `deep thought` | Sum of "thinking" time from assistant events that contain a `thinking` block, capped at 5 minutes per turn so AFK windows don't inflate it. |
+| `skills` | First three skills invoked via the `Skill` tool, comma-joined. |
+| `slash` | First three slash-commands the user typed (parsed from `<command-name>/foo` wrappers), comma-joined. |
+| `wait-then-go` | `× N` — number of times the user sent a new prompt while the assistant was still mid-stream / mid tool-use. |
+| `manners` | `N× please · N× thanks · N× sorry` — politeness word counts across all prompts (English + German patterns). Shown only when total > 0. |
+| `corrections` | `× N · X% of prompts` — count of prompts matching correction patterns ("nein, ich meinte…", "no, use X instead"). Shown only when > 0. OG-skipped. |
+
+### PROMPTING
+
+OG-skipped — this entire section is hidden on the OG preset.
+
+| Stat | Explanation |
+|---|---|
+| `prompts` | Count of real user prompts (system reminders, slash-command wrappers, and subagent task-notifications are filtered out). |
+| `longest` | Longest user prompt length, in chars. |
+| `avg` | Mean user-prompt length, in chars. |
+| `first   "..."` | 60-char preview of the very first prompt. Hidden by default — shown only with `--reveal=prompt`. |
+| `shortest "..." (N chars)` | Full text of the shortest real prompt plus its char count (collapsed-whitespace, capped at 80 chars in the preview). Hidden by default — shown only with `--reveal=prompt`. |
+| `<mood> · sha:XXXXXX` | Mood glyph (`//` neutral, `!!` fire, `++` build, `??` think) plus a 6-char SHA-256 fingerprint of the first prompt. Always shown — the fingerprint is privacy-safe. |
+
+### BADGES
+
+Up to 3 achievements, ordered rarest-first. Shown only when at least one fires. OG-skipped.
+
+| Stat | Explanation |
+|---|---|
+| 🏆 `Token Millionaire` | Total tokens (input + output + cache_create) ≥ 1,000,000. |
+| 💸 `Big Spender` | `totalUsd` ≥ $5. |
+| 🏃 `Marathoner` | Session duration ≥ 2 hours. |
+| 🤝 `Auto-Pilot` | Longest solo-stretch (gap between user prompts) ≥ 5 minutes. |
+| 🧠 `Deep Thinker` | `thinkingMs` ≥ 50% of active time. |
+| 🔥 `No-Error Streak` | Zero rate-limits, zero ESC interrupts, ≥ 30 minutes duration, and at least one tool call. |
+| ⚡ `Sprinter` | Session under 15 minutes AND ≥ 30 tool calls. |
+| 🛠 `Toolbox Master` | ≥ 50 tool calls total. |
+| 🌙 `Night Owl` | Session start hour is between 22:00 and 05:59 UTC. |
+| 📚 `Researcher` | Read/Grep/WebFetch/Glob dominate the tool mix (researcher score ≥ 0.5). |
+| 🐛 `Bug Hunter` | Bug keywords (fix/bug/broken/error/crash/wrong) appear in a high fraction of prompts (fixer score ≥ 0.5). |
+| 🙏 `Polite` | `please + thanks + sorry` ≥ 5 across all prompts. |
+
+### ARCHETYPE
+
+A single persona stamped at the foot of the receipt. Picked by the highest-scoring archetype across eight axes; ties broken by a fixed priority list.
+
+| Stat | Explanation |
+|---|---|
+| `THE SPECIFIER` | Long prompts containing concrete file paths. Tagline: `N% of your prompts had explicit paths`. |
+| `THE VIBE-CODER` | Short prompts, no code blocks. Tagline: `N chars per prompt — you trusted the model`. |
+| `THE FIXER` | High share of bug-keyword prompts. Tagline: `N% of your prompts mentioned a bug`. |
+| `THE RESEARCHER` | Read/Grep dominates over Edit/Write. Tagline: `R reads · E edits — recon mode`. |
+| `THE FIREFIGHTER` | High rate-limit and ESC-interrupt count. Tagline: `you survived N errors`. |
+| `THE TRUSTFALL PILOT` | Long solo-stretches, low intervention rate. Tagline: `claude ran D solo — you trusted`. |
+| `THE ESC-RAGER` | High ESC-interrupts per prompt. Tagline: `N× ESC — you have standards`. |
+| `THE NIGHT OWL` | Session started at night. Tagline: `session at HH:MM — others were asleep`. |
+
+### Footer
+
+| Stat | Explanation |
+|---|---|
+| `· active time across parallel sessions ·` | Italic hint above the footer, shown only in combine/window modes — reminds the reader that `active time` can exceed `wall window` when sessions overlap. |
+| `generated with vibe-receipt` | Footer attribution. |
+| `github.com/loris307/vibe-receipt` | Repo link. |
+
+---
+
+## Persistent history & comparisons
+
+`vs last` and `week rank` lines are derived from a local `~/.vibe-receipt/history.jsonl` (one row per render, redacted, idempotent). Inspect or wipe it:
 
 ```bash
 vibe-receipt history list
 vibe-receipt history clear
 vibe-receipt history export
-VIBE_RECEIPT_NO_HISTORY=1 vibe-receipt    # opt-out
+VIBE_RECEIPT_NO_HISTORY=1 vibe-receipt    # opt-out (skips both reads and writes)
 ```
 
-The receipt's "vs last session" and "week rank" italic lines come from this history file. Combine modes don't appear in history.
+Combine and window modes are not recorded in history.
 
 ---
 

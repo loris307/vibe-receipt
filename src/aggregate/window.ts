@@ -1,6 +1,6 @@
-import { buildCombinedReceipt } from "./combine.js";
 import type { Receipt, ReceiptScope } from "../data/receipt-schema.js";
 import type { NormalizedSession } from "../data/types.js";
+import { buildCombinedReceipt } from "./combine.js";
 
 function startOfTodayLocal(): number {
   const d = new Date();
@@ -25,6 +25,9 @@ export function todayWindowSinceMs(): number {
 export function weekWindowSinceMs(): number {
   return startOfWeekRollingMs();
 }
+export function yearWindowSinceMs(year?: number): number {
+  return startOfYearLocal(year ?? new Date().getFullYear());
+}
 
 export function buildTodayReceipt(sessions: NormalizedSession[]): Receipt {
   const since = todayWindowSinceMs();
@@ -38,8 +41,7 @@ export function buildWeekReceipt(sessions: NormalizedSession[]): Receipt {
   const since = weekWindowSinceMs();
   const filtered = sessions.filter((s) => new Date(s.endUtc).getTime() >= since);
   if (filtered.length === 0) throw new Error("no sessions match window=week");
-  const scope: ReceiptScope = { kind: "combine-since", since: "P7D" };
-  // Use combine-since semantically; we expose `week` to the user but model it as P7D for the scope.
+  const scope: ReceiptScope = { kind: "window-week" };
   return buildCombinedReceipt(filtered, scope);
 }
 

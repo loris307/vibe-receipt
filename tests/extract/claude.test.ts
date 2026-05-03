@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { extractClaudePersonality } from "../../src/extract/personality/claude-jsonl.js";
-import { loadClaudeFromFile } from "../../src/extract/claude.js";
 import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+import { loadClaudeFromFile } from "../../src/extract/claude.js";
+import { extractClaudePersonality } from "../../src/extract/personality/claude-jsonl.js";
 
 const SHORT = resolve(__dirname, "../fixtures/claude/short-session.jsonl");
 const MULTI = resolve(__dirname, "../fixtures/claude/multi-model.jsonl");

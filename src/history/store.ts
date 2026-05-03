@@ -9,10 +9,7 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
-import {
-  HISTORY_SCHEMA_VERSION,
-  type SessionHistoryEntry,
-} from "./types.js";
+import { HISTORY_SCHEMA_VERSION, type SessionHistoryEntry } from "./types.js";
 
 export const HISTORY_DIR = resolve(homedir(), ".vibe-receipt");
 export const HISTORY_PATH = resolve(HISTORY_DIR, "history.jsonl");
@@ -65,10 +62,7 @@ export function readHistory(path: string = HISTORY_PATH): SessionHistoryEntry[] 
  *
  * Uses a tmpfile + rename strategy when rewriting; plain append otherwise.
  */
-export function writeHistoryEntry(
-  entry: SessionHistoryEntry,
-  path: string = HISTORY_PATH,
-): void {
+export function writeHistoryEntry(entry: SessionHistoryEntry, path: string = HISTORY_PATH): void {
   ensureHistoryDir();
   const existing = readHistory(path);
   const matchIdx = existing.findIndex(
@@ -78,7 +72,7 @@ export function writeHistoryEntry(
   if (matchIdx === -1) {
     // append
     try {
-      appendFileSync(path, JSON.stringify(entry) + "\n", "utf8");
+      appendFileSync(path, `${JSON.stringify(entry)}\n`, "utf8");
     } catch {
       // never throw
     }
@@ -89,11 +83,7 @@ export function writeHistoryEntry(
   existing[matchIdx] = entry;
   const tmp = `${path}.tmp`;
   try {
-    writeFileSync(
-      tmp,
-      existing.map((e) => JSON.stringify(e)).join("\n") + "\n",
-      "utf8",
-    );
+    writeFileSync(tmp, `${existing.map((e) => JSON.stringify(e)).join("\n")}\n`, "utf8");
     renameSync(tmp, path);
   } catch {
     // best-effort cleanup

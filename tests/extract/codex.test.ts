@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { extractCodexPersonality } from "../../src/extract/personality/codex-jsonl.js";
-import { loadCodexFromFile } from "../../src/extract/codex.js";
 import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+import { loadCodexFromFile } from "../../src/extract/codex.js";
+import { extractCodexPersonality } from "../../src/extract/personality/codex-jsonl.js";
 
 const STD = resolve(__dirname, "../fixtures/codex/standard-session.jsonl");
 
@@ -58,5 +58,35 @@ describe("loadCodexFromFile", () => {
     expect(ns.totalCostUsd).toBeGreaterThan(0);
     // sanity: cost should be quite small for ~2k input + 380 output
     expect(ns.totalCostUsd).toBeLessThan(0.05);
+  });
+});
+
+const NEWFMT = resolve(__dirname, "../fixtures/codex/new-format-session.jsonl");
+
+describe("extractCodexPersonality (new Codex shape, v0.128+)", () => {
+  it("reads tokens from payload.info.total_token_usage", async () => {
+    const p = await extractCodexPersonality(NEWFMT);
+    expect(p.inputTokens).toBe(2000);
+    expect(p.cachedInputTokens).toBe(1500);
+    expect(p.outputTokens).toBe(300);
+    expect(p.reasoningOutputTokens).toBe(80);
+  });
+
+  it("reads user prompt from event_msg/user_message.message", async () => {
+    const p = await extractCodexPersonality(NEWFMT);
+    expect(p.firstPrompt).toBe("Add a CSV helper test");
+    expect(p.promptLengths.length).toBe(1);
+  });
+
+  it("counts exec_command as bash", async () => {
+    const p = await extractCodexPersonality(NEWFMT);
+    expect(p.toolCounts.exec_command).toBe(1);
+    expect(p.bashCommands).toBe(1);
+  });
+
+  it("loadCodexFromFile produces non-zero cost for new format", async () => {
+    const ns = await loadCodexFromFile(NEWFMT);
+    expect(ns.totalCostUsd).toBeGreaterThan(0);
+    expect(ns.inputTokens).toBe(2000);
   });
 });

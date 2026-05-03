@@ -11,28 +11,35 @@ try {
 }
 
 import { mkdirSync, writeFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { dirname, format as formatPath, parse as parsePath, resolve } from "node:path";
 import ms from "ms";
+import { buildCombinedReceipt } from "./aggregate/combine.js";
+import { deriveComparison } from "./aggregate/comparisons.js";
+import { pickMostRecent } from "./aggregate/pick-most-recent.js";
+import { buildSingleReceipt } from "./aggregate/single.js";
+import {
+  buildTodayReceipt,
+  buildWeekReceipt,
+  buildYearReceipt,
+  todayWindowSinceMs,
+  weekWindowSinceMs,
+  yearWindowSinceMs,
+} from "./aggregate/window.js";
+import type { Receipt } from "./data/receipt-schema.js";
+import { NO_REVEAL } from "./data/types.js";
+import type { NormalizedSession, Source } from "./data/types.js";
 import { loadClaudeSessions } from "./extract/claude.js";
 import { loadCodexSessions } from "./extract/codex.js";
-import { buildSingleReceipt } from "./aggregate/single.js";
-import { buildCombinedReceipt } from "./aggregate/combine.js";
-import { buildTodayReceipt, buildWeekReceipt, buildYearReceipt } from "./aggregate/window.js";
-import { pickMostRecent } from "./aggregate/pick-most-recent.js";
-import { applyRedaction, parseRevealFlag, withRawPrompt } from "./redact/smart-redact.js";
-import { NO_REVEAL } from "./data/types.js";
 import { recordSession } from "./history/record.js";
-import { readHistory } from "./history/store.js";
-import { deriveComparison } from "./aggregate/comparisons.js";
-import { renderPng } from "./render/png.js";
-import { renderAnsi } from "./render/ansi.js";
-import { parseSizeFlag, type SizePreset } from "./render/sizes.js";
-import { pickLang, strings } from "./i18n/index.js";
-import type { NormalizedSession, Source } from "./data/types.js";
-import { installHook, uninstallHook, hookStatus } from "./hook/install.js";
+import { isHistoryDisabled, readHistory } from "./history/store.js";
+import { hookStatus, installHook, uninstallHook } from "./hook/install.js";
 import { handleHookReceive } from "./hook/on-session-end.js";
 import { listSourcesSummary } from "./hook/sources-summary.js";
-import type { Receipt } from "./data/receipt-schema.js";
+import { pickLang, strings } from "./i18n/index.js";
+import { applyRedaction, parseRevealFlag, withRawPrompt } from "./redact/smart-redact.js";
+import { renderAnsi } from "./render/ansi.js";
+import { renderPng } from "./render/png.js";
+import { type SizePreset, parseSizeFlag } from "./render/sizes.js";
 
 const VERSION = "0.3.0";
 
@@ -121,6 +128,23 @@ function defaultOut(idOrHash: string): string {
   return resolve(process.cwd(), "vibe-receipts", `${idOrHash}.png`);
 }
 
+/**
+ * Derive a size-suffixed path from the user's --out value, e.g.
+ *   /tmp/x/receipt.png + portrait → /tmp/x/receipt-portrait.png
+ *   /tmp/x/receipt    + portrait → /tmp/x/receipt-portrait.png  (no ext → add .png)
+ * Used by --size all + --out so all three sizes write under the requested path
+ * instead of being silently dropped.
+ */
+function deriveSizedOutPath(outFlag: string, size: string): string {
+  const abs = resolve(outFlag);
+  const parsed = parsePath(abs);
+  return formatPath({
+    dir: parsed.dir,
+    name: `${parsed.name}-${size}`,
+    ext: parsed.ext || ".png",
+  });
+}
+
 async function loadAllSources(opts: {
   source?: Source;
   sinceMs?: number;
@@ -158,34 +182,36 @@ async function emit(opts: {
   if (rawFirstPrompt) receipt = withRawPrompt(receipt, rawFirstPrompt);
 
   // v0.2 — derive comparisons against persistent history BEFORE recording the
-  // current session (self-exclusion handles the case where the current session
-  // is already in history from a prior render).
-  try {
-    const history = readHistory();
-    const comparison = deriveComparison(receipt, history);
-    if (comparison) receipt = { ...receipt, comparison };
-  } catch {
-    // ignore — comparisons are best-effort
-  }
+  // current session. Honor VIBE_RECEIPT_NO_HISTORY for both reads AND writes:
+  // users opting out of history shouldn't see comparison data either.
+  if (!isHistoryDisabled()) {
+    try {
+      const history = readHistory();
+      const comparison = deriveComparison(receipt, history);
+      if (comparison) receipt = { ...receipt, comparison };
+    } catch {
+      // ignore — comparisons are best-effort
+    }
 
-  // Record session history in ALWAYS-redacted form (privacy-safe regardless
-  // of user's --reveal choices). Best-effort, never blocks render.
-  try {
-    recordSession(applyRedaction(receipt, NO_REVEAL));
-  } catch {
-    // ignore
+    // Record session history in ALWAYS-redacted form (privacy-safe regardless
+    // of user's --reveal choices). Best-effort, never blocks render.
+    try {
+      recordSession(applyRedaction(receipt, NO_REVEAL));
+    } catch {
+      // ignore
+    }
   }
 
   receipt = applyRedaction(receipt, reveal);
 
   if (wantJson) {
-    process.stdout.write(JSON.stringify(receipt, null, 2) + "\n");
+    process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
     return;
   }
 
   if (!noPreview) {
     const preview = renderAnsi(receipt, sStrings);
-    process.stderr.write(preview + "\n");
+    process.stderr.write(`${preview}\n`);
   }
 
   if (wantReview) {
@@ -203,12 +229,14 @@ async function emit(opts: {
 
   const outFlag = typeof flags.out === "string" ? flags.out : null;
   for (const size of sizes) {
-    // Always suffix size in the default filename so different --size flags
-    // don't overwrite each other on subsequent runs.
-    const outPath =
-      outFlag && sizes.length === 1
+    // --out + single size → use it verbatim. --out + multi size (e.g. --size all)
+    // → derive `<basename>-<size><ext>` paths so all sizes are saved instead of
+    // silently dropped. No --out → default ./vibe-receipts/<id>-<size>.png.
+    const outPath = outFlag
+      ? sizes.length === 1
         ? resolve(outFlag)
-        : defaultOut(`${baseId}-${size}`);
+        : deriveSizedOutPath(outFlag, size)
+      : defaultOut(`${baseId}-${size}`);
     ensureDir(outPath);
     const png = await renderPng({ receipt, s: sStrings, size });
     writeFileSync(outPath, png);
@@ -227,8 +255,7 @@ async function readYesNo(prompt: string): Promise<boolean> {
 }
 
 async function cmdShow(parsed: ParsedArgs): Promise<number> {
-  const sessionFlag =
-    typeof parsed.flags.session === "string" ? parsed.flags.session : undefined;
+  const sessionFlag = typeof parsed.flags.session === "string" ? parsed.flags.session : undefined;
   const source =
     typeof parsed.flags.source === "string" ? (parsed.flags.source as Source) : undefined;
   const sessions = await loadAllSources({ source, sessionId: sessionFlag });
@@ -238,11 +265,31 @@ async function cmdShow(parsed: ParsedArgs): Promise<number> {
     );
     return 1;
   }
-  const target = sessionFlag
-    ? sessions.find((s) => s.sessionId === sessionFlag) ?? null
-    : pickMostRecent(sessions, source);
+  let target: NormalizedSession | null;
+  if (sessionFlag) {
+    // Exact match wins; otherwise short-prefix match against full UUIDs.
+    const exact = sessions.find((s) => s.sessionId === sessionFlag);
+    const matches = exact ? [exact] : sessions.filter((s) => s.sessionId.startsWith(sessionFlag));
+    if (matches.length === 0) {
+      target = null;
+    } else if (matches.length === 1) {
+      target = matches[0]!;
+    } else {
+      // Ambiguous prefix: show top candidates so the user can disambiguate.
+      const list = matches
+        .slice(0, 5)
+        .map((s) => `  ${s.sessionId} · ${s.source} · ${s.startUtc}`)
+        .join("\n");
+      process.stderr.write(
+        `ambiguous --session prefix '${sessionFlag}' matches ${matches.length} sessions:\n${list}\n`,
+      );
+      return 1;
+    }
+  } else {
+    target = pickMostRecent(sessions, source);
+  }
   if (!target) {
-    process.stderr.write(`session not found\n`);
+    process.stderr.write("session not found\n");
     return 1;
   }
   await emit({
@@ -293,11 +340,15 @@ async function cmdCombine(parsed: ParsedArgs): Promise<number> {
   return 0;
 }
 
-async function cmdWindow(
-  kind: "today" | "week" | "year",
-  parsed: ParsedArgs,
-): Promise<number> {
-  const sessions = await loadAllSources({});
+async function cmdWindow(kind: "today" | "week" | "year", parsed: ParsedArgs): Promise<number> {
+  // Pass sinceMs so loaders don't apply the default-picker single-session cap.
+  const sinceMs =
+    kind === "today"
+      ? todayWindowSinceMs()
+      : kind === "week"
+        ? weekWindowSinceMs()
+        : yearWindowSinceMs();
+  const sessions = await loadAllSources({ sinceMs });
   if (sessions.length === 0) {
     process.stderr.write("no sessions found\n");
     return 1;
@@ -325,7 +376,7 @@ async function cmdWindow(
 
 async function cmdSources(): Promise<number> {
   const summary = await listSourcesSummary();
-  process.stdout.write(summary + "\n");
+  process.stdout.write(`${summary}\n`);
   return 0;
 }
 
@@ -345,17 +396,17 @@ async function cmdDoctor(): Promise<number> {
     const { Resvg } = await import("@resvg/resvg-js");
     const r = new Resvg('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>');
     void r.render();
-    lines.push(`resvg:   OK`);
+    lines.push("resvg:   OK");
   } catch (e) {
     lines.push(`resvg:   FAIL — ${(e as Error).message}`);
   }
   try {
     await import("ccusage/data-loader");
-    lines.push(`ccusage: OK`);
+    lines.push("ccusage: OK");
   } catch (e) {
     lines.push(`ccusage: FAIL — ${(e as Error).message}`);
   }
-  process.stdout.write(lines.join("\n") + "\n");
+  process.stdout.write(`${lines.join("\n")}\n`);
   return 0;
 }
 
@@ -363,7 +414,10 @@ async function cmdHistory(parsed: ParsedArgs): Promise<number> {
   const { readHistory, clearHistory, HISTORY_PATH } = await import("./history/store.js");
   const sub = parsed.positional[0] ?? "list";
   if (sub === "list") {
-    const limit = typeof parsed.flags.limit === "string" ? Math.max(1, parseInt(parsed.flags.limit, 10)) : 20;
+    const limit =
+      typeof parsed.flags.limit === "string"
+        ? Math.max(1, Number.parseInt(parsed.flags.limit, 10))
+        : 20;
     const all = readHistory().sort((a, b) => b.recordedAt.localeCompare(a.recordedAt));
     if (all.length === 0) {
       process.stderr.write("no history yet — render a receipt first\n");
@@ -371,14 +425,22 @@ async function cmdHistory(parsed: ParsedArgs): Promise<number> {
     }
     process.stdout.write(`history: ${all.length} entries · ${HISTORY_PATH}\n\n`);
     process.stdout.write(
-      ["recorded", "session", "src", "dur", "tokens", "cost", "project"].join("\t") + "\n",
+      `${["recorded", "session", "src", "dur", "tokens", "cost", "project"].join("\t")}\n`,
     );
     for (const e of all.slice(0, limit)) {
-      const dur = (e.durationMs / 60_000).toFixed(0) + "m";
-      const tok = (e.totalTokens / 1000).toFixed(0) + "k";
-      const cost = "$" + e.totalUsd.toFixed(2);
+      const dur = `${(e.durationMs / 60_000).toFixed(0)}m`;
+      const tok = `${(e.totalTokens / 1000).toFixed(0)}k`;
+      const cost = `$${e.totalUsd.toFixed(2)}`;
       process.stdout.write(
-        [e.recordedAt.slice(0, 16), e.sessionId.slice(0, 8), e.source, dur, tok, cost, e.project].join("\t") + "\n",
+        `${[
+          e.recordedAt.slice(0, 16),
+          e.sessionId.slice(0, 8),
+          e.source,
+          dur,
+          tok,
+          cost,
+          e.project,
+        ].join("\t")}\n`,
       );
     }
     return 0;
@@ -390,7 +452,7 @@ async function cmdHistory(parsed: ParsedArgs): Promise<number> {
   }
   if (sub === "export") {
     const all = readHistory();
-    process.stdout.write(JSON.stringify(all, null, 2) + "\n");
+    process.stdout.write(`${JSON.stringify(all, null, 2)}\n`);
     return 0;
   }
   process.stderr.write(`unknown history subcommand: ${sub} (try list/clear/export)\n`);

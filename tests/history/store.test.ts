@@ -1,17 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { mkdtemp } from "node:fs/promises";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  clearHistory,
-  readHistory,
-  writeHistoryEntry,
-} from "../../src/history/store.js";
-import {
-  HISTORY_SCHEMA_VERSION,
-  type SessionHistoryEntry,
-} from "../../src/history/types.js";
+import { describe, expect, it } from "vitest";
+import { clearHistory, readHistory, writeHistoryEntry } from "../../src/history/store.js";
+import { HISTORY_SCHEMA_VERSION, type SessionHistoryEntry } from "../../src/history/types.js";
 
 function entry(over: Partial<SessionHistoryEntry> = {}): SessionHistoryEntry {
   return {
@@ -82,7 +75,7 @@ describe("history store", () => {
     const p = await tempPath();
     writeHistoryEntry(entry({ sessionId: "good" }), p);
     // append corrupt line
-    writeFileSync(p, readFileSync(p, "utf8") + "{ this is not json\n");
+    writeFileSync(p, `${readFileSync(p, "utf8")}{ this is not json\n`);
     const all = readHistory(p);
     expect(all.length).toBe(1);
     expect(all[0]!.sessionId).toBe("good");

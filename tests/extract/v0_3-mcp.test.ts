@@ -1,13 +1,13 @@
-import { describe, expect, it } from "vitest";
-import { writeFile, mkdtemp } from "node:fs/promises";
+import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { describe, expect, it } from "vitest";
 import { extractClaudePersonality } from "../../src/extract/personality/claude-jsonl.js";
 
 async function makeFixture(events: unknown[]): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "vibe-receipt-test-"));
   const path = join(dir, "session.jsonl");
-  await writeFile(path, events.map((e) => JSON.stringify(e)).join("\n") + "\n");
+  await writeFile(path, `${events.map((e) => JSON.stringify(e)).join("\n")}\n`);
   return path;
 }
 
@@ -23,9 +23,7 @@ function assistantWithToolUse(ts: string, toolName: string, toolId: string) {
       role: "assistant",
       model: "claude-opus-4-7",
       stop_reason: "tool_use",
-      content: [
-        { type: "tool_use", id: toolId, name: toolName, input: {} },
-      ],
+      content: [{ type: "tool_use", id: toolId, name: toolName, input: {} }],
       usage: {
         input_tokens: 5,
         output_tokens: 5,
@@ -86,10 +84,22 @@ describe("v0.3 — MCP server extraction", () => {
     let id = 0;
     // 3 servers: heavy=10 calls, medium=5, light=1
     for (let i = 0; i < 10; i++) {
-      events.push(assistantWithToolUse(`2026-01-01T00:00:${String(i).padStart(2, "0")}Z`, "mcp__heavy__a", `t${id++}`));
+      events.push(
+        assistantWithToolUse(
+          `2026-01-01T00:00:${String(i).padStart(2, "0")}Z`,
+          "mcp__heavy__a",
+          `t${id++}`,
+        ),
+      );
     }
     for (let i = 0; i < 5; i++) {
-      events.push(assistantWithToolUse(`2026-01-01T00:01:${String(i).padStart(2, "0")}Z`, "mcp__medium__a", `t${id++}`));
+      events.push(
+        assistantWithToolUse(
+          `2026-01-01T00:01:${String(i).padStart(2, "0")}Z`,
+          "mcp__medium__a",
+          `t${id++}`,
+        ),
+      );
     }
     events.push(assistantWithToolUse("2026-01-01T00:02:00Z", "mcp__light__a", `t${id++}`));
     const path = await makeFixture(events);
@@ -105,8 +115,8 @@ describe("v0.3 — MCP server extraction", () => {
     ]);
     const p = await extractClaudePersonality(path);
     expect(p.mcpServers.map((s) => s.name)).toEqual(["github"]);
-    expect(p.toolCounts["Bash"]).toBe(1);
-    expect(p.toolCounts["mcp__github__a"]).toBe(1);
+    expect(p.toolCounts.Bash).toBe(1);
+    expect(p.toolCounts.mcp__github__a).toBe(1);
   });
 
   it("malformed pattern 'mcp__only' (no separator) → no match", async () => {

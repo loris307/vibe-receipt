@@ -35,8 +35,7 @@ export function moodKindOf(prompt: string): MoodKind {
   if (!prompt) return "neutral";
   const lower = prompt.toLowerCase();
   const exclamations = (prompt.match(/!/g) ?? []).length;
-  const upperRatio =
-    prompt.length > 0 ? (prompt.match(/[A-Z]/g) ?? []).length / prompt.length : 0;
+  const upperRatio = prompt.length > 0 ? (prompt.match(/[A-Z]/g) ?? []).length / prompt.length : 0;
 
   if (
     exclamations >= 2 ||

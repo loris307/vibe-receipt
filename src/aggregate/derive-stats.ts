@@ -9,11 +9,7 @@ export interface TokenEvent {
  * Cost per net line of code shipped, USD.
  * Uses (added - removed); zero or negative net → 0 (display layer hides 0).
  */
-export function computeCostPerLine(
-  totalUsd: number,
-  added: number,
-  removed: number,
-): number {
+export function computeCostPerLine(totalUsd: number, added: number, removed: number): number {
   const net = added - removed;
   if (net <= 0) return 0;
   return totalUsd / net;
@@ -25,9 +21,10 @@ export function computeCostPerLine(
  *
  * Empty input → { tpm: 0, windowStartUtc: null }.
  */
-export function computeBurnRatePeak(
-  events: TokenEvent[],
-): { tpm: number; windowStartUtc: string | null } {
+export function computeBurnRatePeak(events: TokenEvent[]): {
+  tpm: number;
+  windowStartUtc: string | null;
+} {
   if (events.length === 0) return { tpm: 0, windowStartUtc: null };
   const sorted = [...events].sort((a, b) => a.ts - b.ts);
   const windowMs = 60_000;

@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { parse, type ParseError } from "jsonc-parser";
+import { type ParseError, parse } from "jsonc-parser";
 import {
   BACKUP_PATH,
   SETTINGS_PATH,
@@ -59,16 +59,29 @@ export async function installHook(): Promise<number> {
   try {
     const validation = readSettingsString(edited);
     if (!validation.ok) throw new Error(validation.error);
-  } catch (e) {
-    process.stderr.write(`abort: settings.json patch did not reparse cleanly\n`);
+  } catch (_e) {
+    process.stderr.write("abort: settings.json patch did not reparse cleanly\n");
     return 1;
   }
 
   writeSettings(edited);
-  process.stdout.write(
-    `installed SessionEnd hook in ${SETTINGS_PATH}\nbackup at ${BACKUP_PATH}\n`,
-  );
+  process.stdout.write(`installed SessionEnd hook in ${SETTINGS_PATH}\nbackup at ${BACKUP_PATH}\n`);
   return 0;
+}
+
+function hookIsOurs(h: { type?: string; command?: string }): boolean {
+  return typeof h?.command === "string" && h.command.includes("vibe-receipt");
+}
+
+/**
+ * Filter only the OUR child hooks out of an entry. If the entry has no remaining
+ * non-vibe-receipt children, return null to drop it; otherwise return the
+ * pruned entry so user-installed sibling hooks survive uninstall.
+ */
+function pruneEntry(entry: HookEntry): HookEntry | null {
+  const remaining = (entry.hooks ?? []).filter((h) => !hookIsOurs(h));
+  if (remaining.length === 0) return null;
+  return { ...entry, hooks: remaining };
 }
 
 export async function uninstallHook(): Promise<number> {
@@ -84,13 +97,20 @@ export async function uninstallHook(): Promise<number> {
     return 1;
   }
   const sessionEnd: HookEntry[] = parsed.data?.hooks?.SessionEnd ?? [];
-  const filtered = sessionEnd.filter((e) => !entryReferencesUs(e));
-  if (filtered.length === sessionEnd.length) {
+  // Prune our children per-entry, then drop entries that became empty.
+  const updated = sessionEnd
+    .map((e) => (entryReferencesUs(e) ? pruneEntry(e) : e))
+    .filter((e): e is HookEntry => e !== null);
+
+  // Detect if any change actually happened (children removed or empty entries dropped).
+  const beforeChildren = sessionEnd.flatMap((e) => e.hooks ?? []).filter(hookIsOurs).length;
+  if (beforeChildren === 0) {
     process.stdout.write("no vibe-receipt SessionEnd hook found.\n");
     return 0;
   }
+
   backupSettings(parsed.raw);
-  const edited = modifyJsonc(parsed.raw, ["hooks", "SessionEnd"], filtered);
+  const edited = modifyJsonc(parsed.raw, ["hooks", "SessionEnd"], updated);
   writeSettings(edited);
   process.stdout.write("uninstalled vibe-receipt SessionEnd hook.\n");
   return 0;
@@ -108,7 +128,7 @@ export async function hookStatus(): Promise<number> {
     process.stdout.write(
       installed
         ? `installed at ${SETTINGS_PATH}\n`
-        : `not installed (settings.json exists but has no vibe-receipt SessionEnd entry)\n`,
+        : "not installed (settings.json exists but has no vibe-receipt SessionEnd entry)\n",
     );
     return 0;
   } catch (e) {

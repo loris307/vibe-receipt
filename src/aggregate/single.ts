@@ -1,16 +1,11 @@
-import { basename } from "node:path";
 import type { Receipt, ReceiptScope } from "../data/receipt-schema.js";
 import type { NormalizedSession } from "../data/types.js";
 import { topToolStats } from "../data/types.js";
 import { computeFirstPromptFingerprint } from "../redact/fingerprint.js";
-import { promptStatsOf } from "./prompt-stats.js";
-import {
-  computeBurnRatePeak,
-  computeCostPerLine,
-  computeMostEditedFile,
-} from "./derive-stats.js";
-import { deriveArchetype } from "./archetype.js";
 import { deriveAchievements } from "./achievements.js";
+import { deriveArchetype } from "./archetype.js";
+import { computeBurnRatePeak, computeCostPerLine, computeMostEditedFile } from "./derive-stats.js";
+import { promptStatsOf } from "./prompt-stats.js";
 
 export function buildSingleReceipt(ns: NormalizedSession): Receipt {
   const scope: ReceiptScope = { kind: "single", sessionId: ns.sessionId };
@@ -25,7 +20,9 @@ export function buildSingleReceipt(ns: NormalizedSession): Receipt {
     generatedAt: new Date().toISOString(),
 
     meta: {
-      project: basename(ns.cwd) || "unknown",
+      // Pass full cwd here; smart-redact basenames it for default privacy and
+      // preserves the full path under --reveal=paths.
+      project: ns.cwd || "unknown",
       branch: ns.branch,
       sources: [ns.source],
       sessionCount: 1,
@@ -68,6 +65,7 @@ export function buildSingleReceipt(ns: NormalizedSession): Receipt {
       linesAdded: ns.linesAdded,
       linesRemoved: ns.linesRemoved,
       bashCommands: ns.bashCommands,
+      bashCommandsList: ns.bashCommandsList,
       webFetches: ns.webFetches,
       userModified: ns.userModified,
       mostEditedFile: computeMostEditedFile(ns.fileEntries),
@@ -103,9 +101,7 @@ export function buildSingleReceipt(ns: NormalizedSession): Receipt {
       },
       correctionCount: ns.correctionCount,
       correctionRate:
-        ns.promptLengths.length > 0
-          ? ns.correctionCount / ns.promptLengths.length
-          : 0,
+        ns.promptLengths.length > 0 ? ns.correctionCount / ns.promptLengths.length : 0,
     },
 
     firstPrompt: fp,

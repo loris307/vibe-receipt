@@ -1,14 +1,14 @@
-import { describe, expect, it } from "vitest";
-import { writeFile, mkdtemp } from "node:fs/promises";
+import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { extractClaudePersonality } from "../../src/extract/personality/claude-jsonl.js";
+import { describe, expect, it } from "vitest";
 import { getContextWindow } from "../../src/extract/claude-context-windows.js";
+import { extractClaudePersonality } from "../../src/extract/personality/claude-jsonl.js";
 
 async function makeFixture(events: unknown[]): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "vibe-receipt-test-"));
   const path = join(dir, "session.jsonl");
-  await writeFile(path, events.map((e) => JSON.stringify(e)).join("\n") + "\n");
+  await writeFile(path, `${events.map((e) => JSON.stringify(e)).join("\n")}\n`);
   return path;
 }
 

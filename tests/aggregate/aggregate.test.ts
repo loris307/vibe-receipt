@@ -1,10 +1,11 @@
+import { basename, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { resolve } from "node:path";
-import { loadClaudeFromFile } from "../../src/extract/claude.js";
-import { loadCodexFromFile } from "../../src/extract/codex.js";
-import { buildSingleReceipt } from "../../src/aggregate/single.js";
 import { buildCombinedReceipt } from "../../src/aggregate/combine.js";
 import { pickMostRecent } from "../../src/aggregate/pick-most-recent.js";
+import { buildSingleReceipt } from "../../src/aggregate/single.js";
+import { loadClaudeFromFile } from "../../src/extract/claude.js";
+import { loadCodexFromFile } from "../../src/extract/codex.js";
+import { applyRedaction } from "../../src/redact/smart-redact.js";
 
 const SHORT = resolve(__dirname, "../fixtures/claude/short-session.jsonl");
 const MULTI = resolve(__dirname, "../fixtures/claude/multi-model.jsonl");
@@ -17,7 +18,9 @@ describe("buildSingleReceipt", () => {
     expect(r.scope.kind).toBe("single");
     expect(r.meta.sources).toEqual(["claude"]);
     expect(r.meta.sessionCount).toBe(1);
-    expect(r.meta.project).toBe("demo");
+    // buildSingleReceipt holds the full cwd; smart-redact basenames it for default privacy.
+    expect(basename(r.meta.project)).toBe("demo");
+    expect(applyRedaction(r).meta.project).toBe("demo");
     expect(r.meta.branch).toBe("main");
     expect(r.tools.total).toBeGreaterThan(0);
     expect(r.firstPrompt.wordCount).toBeGreaterThan(5);
@@ -59,7 +62,7 @@ describe("buildCombinedReceipt", () => {
     const r = buildCombinedReceipt([a, b], { kind: "combine-since", since: "PT1H" });
     // Same file path → single entry but double counts in lines added
     expect(r.work.filesTouched).toBe(1);
-    expect(r.work.linesAdded).toBe((a.linesAdded + b.linesAdded));
+    expect(r.work.linesAdded).toBe(a.linesAdded + b.linesAdded);
   });
 });
 

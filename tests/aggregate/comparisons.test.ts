@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { deriveComparison } from "../../src/aggregate/comparisons.js";
 import type { Receipt } from "../../src/data/receipt-schema.js";
-import {
-  HISTORY_SCHEMA_VERSION,
-  type SessionHistoryEntry,
-} from "../../src/history/types.js";
+import { HISTORY_SCHEMA_VERSION, type SessionHistoryEntry } from "../../src/history/types.js";
 
 function receipt(over: Partial<Receipt> = {}): Receipt {
   const base: Receipt = {
@@ -26,6 +23,9 @@ function receipt(over: Partial<Receipt> = {}): Receipt {
       longestSoloStretchMs: 0,
       longestSoloStretchStartUtc: null,
       longestSoloStretchEndUtc: null,
+      compactionCount: 0,
+      firstCompactPreTokens: null,
+      firstCompactContextPct: null,
     },
     cost: {
       totalUsd: 5,
@@ -51,7 +51,7 @@ function receipt(over: Partial<Receipt> = {}): Receipt {
       userModified: 0,
       mostEditedFile: null,
     },
-    tools: { total: 0, top: [] },
+    tools: { total: 0, top: [], mcpServers: [], sidechainEvents: 0 },
     subagents: [],
     personality: {
       escInterrupts: 0,
@@ -70,6 +70,8 @@ function receipt(over: Partial<Receipt> = {}): Receipt {
       shortestPromptText: null,
       waitThenGoCount: 0,
       politenessScore: { please: 0, thanks: 0, sorry: 0, total: 0 },
+      correctionCount: 0,
+      correctionRate: 0,
     },
     firstPrompt: {
       wordCount: 0,
@@ -129,9 +131,7 @@ describe("deriveComparison", () => {
   });
 
   it("returns null when only entry is the current session itself", () => {
-    expect(
-      deriveComparison(receipt(), [entry({ sessionId: "current" })], NOW_MAY_2),
-    ).toBeNull();
+    expect(deriveComparison(receipt(), [entry({ sessionId: "current" })], NOW_MAY_2)).toBeNull();
   });
 
   it("computes vs-last-session percent deltas", () => {
@@ -181,7 +181,7 @@ describe("deriveComparison", () => {
     });
     const c = deriveComparison(r, [oldEntry], NOW_MAY_2)!;
     expect(c.vsLastSession).not.toBeNull(); // still found via "vs last"
-    expect(c.vsLast7Days).toBeNull();       // but not in 7-day window
+    expect(c.vsLast7Days).toBeNull(); // but not in 7-day window
   });
 
   it("filters by source", () => {

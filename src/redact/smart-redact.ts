@@ -20,15 +20,22 @@ function redactFile(f: TopFile, reveal: boolean): TopFile {
 
 function redactAfkRecaps(recaps: string[], reveal: boolean): string[] {
   if (reveal) return recaps;
-  return recaps.map((_) => `<recap hidden>`);
+  return recaps.map((_) => "<recap hidden>");
 }
 
 export function applyRedaction(receipt: Receipt, reveal: RevealOpts = NO_REVEAL): Receipt {
+  // Project may be a full path (when retained for --reveal=paths) or already a basename.
+  // Default: always show basename only.
+  const projectShown = reveal.paths
+    ? receipt.meta.project
+    : basename(receipt.meta.project) || receipt.meta.project;
+  // Bash commands list (when extractors retain it) is leak-prone: omit unless --reveal=bash.
+  const bashList = (receipt.work as { bashCommandsList?: string[] | null }).bashCommandsList;
   return {
     ...receipt,
     meta: {
       ...receipt.meta,
-      // meta.project is already basename; nothing further to redact
+      project: projectShown,
       branch: redactBranch(receipt.meta.branch, reveal.paths),
     },
     time: {
@@ -46,12 +53,20 @@ export function applyRedaction(receipt: Receipt, reveal: RevealOpts = NO_REVEAL)
               : basename(receipt.work.mostEditedFile.path),
           }
         : null,
+      ...(bashList !== undefined ? { bashCommandsList: reveal.bash ? bashList : null } : {}),
+    },
+    personality: {
+      ...receipt.personality,
+      // shortestPromptText is leak-prone (full prompt text). Hide unless --reveal=prompt.
+      shortestPromptText: reveal.prompt ? receipt.personality.shortestPromptText : null,
     },
     firstPrompt: {
       ...receipt.firstPrompt,
-      revealed: reveal.prompt
-        ? truncateForReveal(receipt.firstPrompt.revealed)
-        : null,
+      // Both `preview` and `revealed` carry actual prompt text. Default = hide both;
+      // `--reveal=prompt` shows the full revealed string (truncated). Metadata
+      // (wordCount, charCount, moodEmoji, fingerprintSha) is always retained.
+      preview: reveal.prompt ? receipt.firstPrompt.preview : null,
+      revealed: reveal.prompt ? truncateForReveal(receipt.firstPrompt.revealed) : null,
     },
   };
 }

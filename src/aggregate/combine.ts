@@ -1,4 +1,3 @@
-import { basename } from "node:path";
 import type {
   McpServerStat,
   Receipt,
@@ -9,22 +8,19 @@ import type {
 import type { NormalizedSession, Source } from "../data/types.js";
 import { topToolStats } from "../data/types.js";
 import { computeFirstPromptFingerprint } from "../redact/fingerprint.js";
-import { promptStatsOf } from "./prompt-stats.js";
+import { deriveAchievements } from "./achievements.js";
 import {
+  type TokenEvent,
   computeBurnRatePeak,
   computeCostPerLine,
   computeMostEditedFile,
-  type TokenEvent,
 } from "./derive-stats.js";
-import { deriveAchievements } from "./achievements.js";
+import { promptStatsOf } from "./prompt-stats.js";
 
 const TOP_FILES_LIMIT = 5;
 const TOOL_LIMIT = 5;
 
-export function buildCombinedReceipt(
-  sessions: NormalizedSession[],
-  scope: ReceiptScope,
-): Receipt {
+export function buildCombinedReceipt(sessions: NormalizedSession[], scope: ReceiptScope): Receipt {
   if (sessions.length === 0) {
     throw new Error("buildCombinedReceipt: no sessions in scope");
   }
@@ -51,6 +47,8 @@ export function buildCombinedReceipt(
 
   // Tools: re-aggregate
   const toolCounts: Record<string, number> = {};
+  // Bash command list — concat across sessions, capped 50.
+  const bashCommandsList: string[] = [];
 
   // Subagents: concat then sort by duration desc, take top N
   const subagents: Subagent[] = [];
@@ -86,10 +84,7 @@ export function buildCombinedReceipt(
   let firstCompactCarrier: { startUtcMs: number; ns: NormalizedSession } | null = null;
   let sidechainEvents = 0;
   let correctionCount = 0;
-  const mcpAccumulator = new Map<
-    string,
-    { callCount: number; tools: Set<string> }
-  >();
+  const mcpAccumulator = new Map<string, { callCount: number; tools: Set<string> }>();
   const skillSet = new Set<string>();
   const slashSet = new Set<string>();
   const modelSet = new Set<string>();
@@ -138,6 +133,10 @@ export function buildCombinedReceipt(
       }
     }
     bashCommands += s.bashCommands;
+    for (const c of s.bashCommandsList) {
+      if (bashCommandsList.length >= 50) break;
+      bashCommandsList.push(c);
+    }
     webFetches += s.webFetches;
     userModified += s.userModified;
 
@@ -196,13 +195,11 @@ export function buildCombinedReceipt(
       longestSoloStretchStartUtc = s.longestSoloStretchStartUtc;
       longestSoloStretchEndUtc = s.longestSoloStretchEndUtc;
     }
-    if (s.longestUserMsgChars > longestUserMsgChars)
-      longestUserMsgChars = s.longestUserMsgChars;
+    if (s.longestUserMsgChars > longestUserMsgChars) longestUserMsgChars = s.longestUserMsgChars;
     for (const len of s.promptLengths) promptLengths.push(len);
     if (
       s.shortestPromptText !== null &&
-      (shortestPromptText === null ||
-        s.shortestPromptText.length < shortestPromptText.length)
+      (shortestPromptText === null || s.shortestPromptText.length < shortestPromptText.length)
     ) {
       shortestPromptText = s.shortestPromptText;
     }
@@ -260,7 +257,8 @@ export function buildCombinedReceipt(
     scope,
     generatedAt: new Date().toISOString(),
     meta: {
-      project: basename(cwdTop) || "unknown",
+      // Pass full cwd; smart-redact basenames by default and preserves under --reveal=paths.
+      project: cwdTop || "unknown",
       branch: branchTop,
       sources: Array.from(sourceSet),
       sessionCount: sessions.length,
@@ -303,6 +301,7 @@ export function buildCombinedReceipt(
       linesAdded: fileEntries.reduce((s, f) => s + f.added, 0),
       linesRemoved: fileEntries.reduce((s, f) => s + f.removed, 0),
       bashCommands,
+      bashCommandsList,
       webFetches,
       userModified,
       mostEditedFile: computeMostEditedFile(fileEntries),
@@ -335,8 +334,7 @@ export function buildCombinedReceipt(
       },
       correctionCount,
       // re-derive from summed counts — never average per-session rates
-      correctionRate:
-        promptLengths.length > 0 ? correctionCount / promptLengths.length : 0,
+      correctionRate: promptLengths.length > 0 ? correctionCount / promptLengths.length : 0,
     },
     firstPrompt: fp,
     archetype: {

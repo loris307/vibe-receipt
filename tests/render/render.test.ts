@@ -1,15 +1,15 @@
-import { describe, expect, it } from "vitest";
-import { resolve } from "node:path";
-import { writeFileSync, mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+import { buildCombinedReceipt } from "../../src/aggregate/combine.js";
+import { buildSingleReceipt } from "../../src/aggregate/single.js";
 import { loadClaudeFromFile } from "../../src/extract/claude.js";
 import { loadCodexFromFile } from "../../src/extract/codex.js";
-import { buildSingleReceipt } from "../../src/aggregate/single.js";
-import { buildCombinedReceipt } from "../../src/aggregate/combine.js";
-import { applyRedaction } from "../../src/redact/smart-redact.js";
-import { renderPng } from "../../src/render/png.js";
-import { renderAnsi } from "../../src/render/ansi.js";
 import { strings } from "../../src/i18n/index.js";
+import { applyRedaction } from "../../src/redact/smart-redact.js";
+import { renderAnsi } from "../../src/render/ansi.js";
+import { renderPng } from "../../src/render/png.js";
 
 const SHORT = resolve(__dirname, "../fixtures/claude/short-session.jsonl");
 const CODEX = resolve(__dirname, "../fixtures/codex/standard-session.jsonl");

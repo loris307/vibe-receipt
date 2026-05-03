@@ -27,9 +27,7 @@ function resolveFontDir(): string {
       // try next
     }
   }
-  throw new Error(
-    "vibe-receipt: bundled fonts not found. Looked in: " + candidates.join(", "),
-  );
+  throw new Error(`vibe-receipt: bundled fonts not found. Looked in: ${candidates.join(", ")}`);
 }
 
 let _fonts: { name: string; data: Buffer; weight: number; style: "normal" | "italic" }[] | null =

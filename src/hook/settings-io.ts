@@ -1,7 +1,7 @@
-import { readFileSync, writeFileSync, existsSync, copyFileSync } from "node:fs";
+import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
-import { applyEdits, modify, parse, ParseError } from "jsonc-parser";
+import { ParseError, applyEdits, modify, parse } from "jsonc-parser";
 
 export const SETTINGS_PATH = resolve(homedir(), ".claude", "settings.json");
 export const BACKUP_PATH = resolve(homedir(), ".claude", "settings.json.vibe-receipt.bak");
@@ -14,14 +14,12 @@ export function readSettings(): { raw: string; data: any } {
   const errs: ParseError[] = [];
   const data = parse(raw, errs, { allowTrailingComma: true });
   if (errs.length > 0) {
-    throw new Error(
-      `~/.claude/settings.json contains invalid JSONC at offset ${errs[0]!.offset}`,
-    );
+    throw new Error(`~/.claude/settings.json contains invalid JSONC at offset ${errs[0]!.offset}`);
   }
   return { raw, data: data ?? {} };
 }
 
-export function backupSettings(raw: string) {
+export function backupSettings(_raw: string) {
   if (!existsSync(SETTINGS_PATH)) return;
   copyFileSync(SETTINGS_PATH, BACKUP_PATH);
 }
@@ -30,11 +28,7 @@ export function writeSettings(raw: string) {
   writeFileSync(SETTINGS_PATH, raw, { encoding: "utf8" });
 }
 
-export function modifyJsonc(
-  raw: string,
-  path: (string | number)[],
-  value: unknown,
-): string {
+export function modifyJsonc(raw: string, path: (string | number)[], value: unknown): string {
   const edits = modify(raw, path, value, {
     formattingOptions: { tabSize: 2, insertSpaces: true },
   });

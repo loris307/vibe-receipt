@@ -1,10 +1,4 @@
-import type {
-  McpServerStat,
-  Source,
-  Subagent,
-  ToolStat,
-  TopFile,
-} from "./receipt-schema.js";
+import type { McpServerStat, Source, Subagent, ToolStat, TopFile } from "./receipt-schema.js";
 
 export type { Source } from "./receipt-schema.js";
 
@@ -41,6 +35,9 @@ export interface NormalizedSession {
   linesAdded: number;
   linesRemoved: number;
   bashCommands: number;
+  /** Captured Bash command-line strings, in chronological order, capped at 50.
+   *  Hidden by default; surfaced via --reveal=bash. */
+  bashCommandsList: string[];
   webFetches: number;
   userModified: number;
 
@@ -121,10 +118,7 @@ export interface RevealOpts {
 }
 export const NO_REVEAL: RevealOpts = { paths: false, prompt: false, bash: false };
 
-export function topToolStats(
-  toolCounts: Record<string, number>,
-  limit = 5,
-): ToolStat[] {
+export function topToolStats(toolCounts: Record<string, number>, limit = 5): ToolStat[] {
   return Object.entries(toolCounts)
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count)

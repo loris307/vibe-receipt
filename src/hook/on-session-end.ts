@@ -1,6 +1,6 @@
-import { appendFileSync, mkdirSync, existsSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { resolve, dirname } from "node:path";
+import { resolve } from "node:path";
 
 const STATE_DIR = resolve(homedir(), ".vibe-receipt");
 const INDEX_PATH = resolve(STATE_DIR, "index.jsonl");
@@ -51,11 +51,11 @@ export async function handleHookReceive(): Promise<void> {
     raw: payload ?? null,
   };
   try {
-    appendFileSync(INDEX_PATH, JSON.stringify(record) + "\n", "utf8");
+    appendFileSync(INDEX_PATH, `${JSON.stringify(record)}\n`, "utf8");
   } catch {
     // never block shutdown
   }
-  process.stderr.write(`📸 Receipt ready · vibe-receipt show\n`);
+  process.stderr.write("📸 Receipt ready · vibe-receipt show\n");
 }
 
 export const HOOK_INDEX_PATH = INDEX_PATH;

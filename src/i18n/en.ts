@@ -52,6 +52,12 @@ export const en = {
   labelShortestText: "shortest",
 
   fpUnit: "words",
+  unitChars: "chars",
+  unitTool: "tool",
+  unitTools: "tools",
+  politenessPlease: "please",
+  politenessThanks: "thanks",
+  politenessSorry: "sorry",
   fpFooterShaPrefix: "sha:",
 
   footerGen: "generated with vibe-receipt",

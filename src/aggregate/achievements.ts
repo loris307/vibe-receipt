@@ -67,7 +67,7 @@ const CATALOG: Rule[] = [
     glyph: "🌙",
     trigger: (r) => {
       // UTC-based for determinism (matches archetype rule + header timestamp)
-      const h = parseInt(r.time.startUtc.slice(11, 13), 10);
+      const h = Number.parseInt(r.time.startUtc.slice(11, 13), 10);
       return Number.isFinite(h) && (h >= 22 || h < 6);
     },
   },

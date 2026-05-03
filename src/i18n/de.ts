@@ -17,7 +17,7 @@ export const de: Strings = {
   labelSubagentCount: "anzahl",
   labelSubagentTotalTime: "gesamtzeit",
   labelSubagentTotalTokens: "tokens gesamt",
-  labelSubagentTotalTools: "tool calls",
+  labelSubagentTotalTools: "tool-aufrufe",
   sectionPersonality: "CHARAKTER",
   sectionFirstPrompt: "PROMPTING",
 
@@ -54,6 +54,12 @@ export const de: Strings = {
   labelShortestText: "kürzester",
 
   fpUnit: "wörter",
+  unitChars: "zeichen",
+  unitTool: "tool",
+  unitTools: "tools",
+  politenessPlease: "bitte",
+  politenessThanks: "danke",
+  politenessSorry: "sorry",
   fpFooterShaPrefix: "sha:",
 
   footerGen: "erstellt mit vibe-receipt",

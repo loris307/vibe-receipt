@@ -1,8 +1,8 @@
-import { readJsonlAll } from "../../util/jsonl.js";
 import type { Subagent, TopFile } from "../../data/receipt-schema.js";
-import { scorePoliteness } from "../politeness.js";
+import { readJsonlAll } from "../../util/jsonl.js";
 import { getContextWindow } from "../claude-context-windows.js";
 import { countCorrections } from "../corrections.js";
+import { scorePoliteness } from "../politeness.js";
 
 /**
  * Personality fields extracted from a Claude Code JSONL file.
@@ -27,6 +27,8 @@ export interface ClaudePersonality {
   linesAdded: number;
   linesRemoved: number;
   bashCommands: number;
+  /** Captured Bash command strings (input.command of tool_use Bash blocks). */
+  bashCommandsList: string[];
   webFetches: number;
   userModified: number;
 
@@ -93,8 +95,7 @@ function userEventStringContent(evt: any): string | null {
   if (Array.isArray(content)) {
     // Only extract if it's a "real" user message (not a tool_result wrapper)
     const hasRealText = content.some(
-      (c: any) =>
-        c && typeof c === "object" && c.type === "text" && typeof c.text === "string",
+      (c: any) => c && typeof c === "object" && c.type === "text" && typeof c.text === "string",
     );
     if (!hasRealText) return null;
     return content
@@ -211,6 +212,7 @@ export async function extractClaudePersonality(
     linesAdded: 0,
     linesRemoved: 0,
     bashCommands: 0,
+    bashCommandsList: [],
     webFetches: 0,
     userModified: 0,
 
@@ -280,8 +282,7 @@ export async function extractClaudePersonality(
   // Server names may contain underscores ("my_server"); the FIRST `__` after the
   // `mcp__` prefix is the unambiguous server/tool separator.
   const MCP_NAME_PATTERN = /^mcp__(.+?)__(.+)$/;
-  const mcpAccumulator: Map<string, { callCount: number; tools: Set<string> }> =
-    new Map();
+  const mcpAccumulator: Map<string, { callCount: number; tools: Set<string> }> = new Map();
 
   // Track thinking turns: index of assistant events with thinking blocks → timestamp
   // We compute thinking duration as `nextEvent.timestamp - thisEvent.timestamp` (capped).
@@ -338,7 +339,7 @@ export async function extractClaudePersonality(
         // Dedup by uuid when present (matches seenToolUseIds pattern); count regardless
         // when uuid absent so malformed events don't silently undercount.
         const uuid = typeof evt.uuid === "string" ? evt.uuid : null;
-        const counted = uuid && compactionUuids.has(uuid) ? false : true;
+        const counted = !(uuid && compactionUuids.has(uuid));
         if (counted) {
           if (uuid) compactionUuids.add(uuid);
           out.compactionCount += 1;
@@ -398,17 +399,15 @@ export async function extractClaudePersonality(
         }
         if (!out.firstPrompt) out.firstPrompt = realPrompt.real;
         if (len > out.longestUserMsgChars) out.longestUserMsgChars = len;
-        if (
-          out.shortestPromptText === null ||
-          len < out.shortestPromptText.length
-        ) {
+        if (out.shortestPromptText === null || len < out.shortestPromptText.length) {
           out.shortestPromptText = realPrompt.real;
         }
       }
       // tool_result + toolUseResult — count file/bash effects
       const tur = evt.toolUseResult;
       const content = evt.message?.content;
-      const isToolResult = Array.isArray(content) && content.some((c: any) => c?.type === "tool_result");
+      const isToolResult =
+        Array.isArray(content) && content.some((c: any) => c?.type === "tool_result");
       if (isToolResult && tur && typeof tur === "object") {
         // Detect file-edit results by SHAPE (not by `type` field — Edit's
         // toolUseResult has no `type` at all; Write has type:"create" with
@@ -422,8 +421,7 @@ export async function extractClaudePersonality(
 
         if (isFileEditResult) {
           const fp = tur.filePath;
-          if (!filePatchById.has(fp))
-            filePatchById.set(fp, { added: 0, removed: 0, editCount: 0 });
+          if (!filePatchById.has(fp)) filePatchById.set(fp, { added: 0, removed: 0, editCount: 0 });
           const acc = filePatchById.get(fp)!;
           acc.editCount += 1;
 
@@ -518,8 +516,13 @@ export async function extractClaudePersonality(
           const name = String(block.name ?? "");
           if (!name) continue;
           out.toolCounts[name] = (out.toolCounts[name] ?? 0) + 1;
-          if (name === "Bash") out.bashCommands += 1;
-          else if (name === "WebFetch") out.webFetches += 1;
+          if (name === "Bash") {
+            out.bashCommands += 1;
+            const cmd = block.input?.command;
+            if (typeof cmd === "string" && out.bashCommandsList.length < 50) {
+              out.bashCommandsList.push(cmd);
+            }
+          } else if (name === "WebFetch") out.webFetches += 1;
           else if (name === "Skill" && typeof block.input?.skill === "string") {
             skillSet.add(block.input.skill);
           }
@@ -567,7 +570,6 @@ export async function extractClaudePersonality(
           }
         }
       }
-      continue;
     }
   }
 
@@ -644,9 +646,7 @@ export async function extractClaudePersonality(
   // v0.2 — longest solo-stretch: max gap between two consecutive REAL user prompts.
   // (one prompt → 0; no prompts → 0.)
   if (out.promptTimestamps.length >= 2) {
-    const tss = out.promptTimestamps
-      .map((s) => Date.parse(s))
-      .filter((n) => Number.isFinite(n));
+    const tss = out.promptTimestamps.map((s) => Date.parse(s)).filter((n) => Number.isFinite(n));
     tss.sort((a, b) => a - b);
     let maxGap = 0;
     let maxStart: number | null = null;
@@ -669,10 +669,7 @@ export async function extractClaudePersonality(
     const ctxModel = firstCompactModel ?? out.models[0] ?? "";
     const window = getContextWindow(ctxModel);
     if (window > 0) {
-      out.firstCompactContextPct = Math.min(
-        1,
-        Math.max(0, out.firstCompactPreTokens / window),
-      );
+      out.firstCompactContextPct = Math.min(1, Math.max(0, out.firstCompactPreTokens / window));
     }
   }
 

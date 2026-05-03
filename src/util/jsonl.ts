@@ -1,15 +1,13 @@
-import { createInterface } from "node:readline";
 import { createReadStream } from "node:fs";
+import { createInterface } from "node:readline";
 
 /**
  * Streams JSONL events line-by-line. Silently skips malformed lines (matches ccusage behavior).
  * Returns an async iterable of parsed JSON objects.
  */
-export async function* readJsonl<T = unknown>(
-  filePath: string,
-): AsyncGenerator<T, void, void> {
+export async function* readJsonl<T = unknown>(filePath: string): AsyncGenerator<T, void, void> {
   const stream = createReadStream(filePath, { encoding: "utf8" });
-  const rl = createInterface({ input: stream, crlfDelay: Infinity });
+  const rl = createInterface({ input: stream, crlfDelay: Number.POSITIVE_INFINITY });
   for await (const line of rl) {
     const trimmed = line.trim();
     if (!trimmed) continue;

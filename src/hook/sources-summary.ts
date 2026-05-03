@@ -1,7 +1,6 @@
 import { existsSync, statSync } from "node:fs";
-import { homedir } from "node:os";
-import { resolve } from "node:path";
 import { glob } from "node:fs/promises";
+import { resolve } from "node:path";
 import { getClaudeJsonlRoots } from "../extract/claude.js";
 import { getCodexJsonlRoot } from "../extract/codex.js";
 
@@ -45,7 +44,7 @@ export async function listSourcesSummary(): Promise<string> {
   for (const r of claudeRoots) rows.push(await summarizeRoot("claude", r));
   rows.push(await summarizeRoot("codex", codexRoot));
 
-  const lines = [`Detected JSONL sources:\n`];
+  const lines = ["Detected JSONL sources:\n"];
   for (const r of rows) {
     if (!r.exists) {
       lines.push(`  [${r.source}] ${r.root}  (not present)`);
