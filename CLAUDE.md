@@ -29,7 +29,7 @@ TypeScript 5.7 (ESM-only, `"type": "module"`), Node ≥ 20.19.4, pnpm. Bundled w
 - `assets/fonts/` → JetBrains Mono, required at render time (satori loads it)
 - `tests/` mirrors `src/`; `tests/fixtures/**/*.jsonl` are frozen real-world captures
 - `docs/spec.md`, `docs/masterplan-v*.md` → hand-written specs/plans; check before large changes
-- `fixes.md` → live audit log of known bugs (dated, current); read before touching extract/aggregate/render
+- `fixes.md` → working bug list (Open / Resolved sections). Add new bugs to Open; move to Resolved when fixed.
 
 ## Rules
 - ESM only. Use `node:` import protocol (biome enforces `useNodejsImportProtocol`). No `require()`, no CommonJS output.
@@ -37,7 +37,7 @@ TypeScript 5.7 (ESM-only, `"type": "module"`), Node ≥ 20.19.4, pnpm. Bundled w
 - Never hand-edit `tests/fixtures/**/*.jsonl` — they are frozen Claude Code / Codex captures and are biome-ignored on purpose.
 - Redaction defaults must hide prompt text, file paths, AFK recaps, and bash commands. Apply `applyRedaction(receipt, reveal)` in `cli.ts` BEFORE rendering or `--json` emit. `--reveal=paths|prompt|bash` opts in.
 - When changing the `Receipt` shape, update `src/data/receipt-schema.ts` first, then propagate through aggregate → render → ansi. Schema is the contract.
-- Before claiming a fix or feature done, check `fixes.md` (dated audit log) — many bugs there are still open. Don't introduce regressions of issues already documented.
+- Before claiming a fix or feature done, scan `fixes.md` Resolved list for issues in the same area to avoid regressing them.
 - IMPORTANT: run `pnpm typecheck` AND `pnpm lint` after every code change. Biome's `organizeImports` is canonical — never hand-sort imports; run `pnpm format`.
 
 ## Workflow
