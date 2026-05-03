@@ -43,3 +43,7 @@ Second-pass audit (also fixed):
 Third-pass (live end-to-end smoke test against fresh `codex exec` + `claude -p` sessions):
 
 - Codex `input_tokens` is GROSS (already includes `cached_input_tokens`), but the Codex loader stored both as separate fields — render formula `input + output + cacheCreate + cacheRead` then double-counted the cached portion. The 17.7k-token smoke session reported as 30k tokens with 40% cache hit when it's really 18k tokens with 66% cache hit. Loader now subtracts cached from input to align with Claude's net-input semantics; cost was already correct but is unchanged because the cost formula simplified accordingly.
+
+Fourth-pass (live tool-using `codex exec` session that called `apply_patch`):
+
+- Codex CLI now emits `apply_patch` as a `response_item/custom_tool_call` with the raw patch text in `payload.input`, not as a `function_call` with `payload.arguments` containing `{"patch": "..."}`. The extractor only handled `function_call`, so apply_patch was completely invisible — files touched, lines added, lines removed, and the apply_patch entry in TOP TOOLS were all silently zero for any session that edited files via the new shape. A fresh `codex exec` smoke that created hello.txt with two lines reported 0 files / 0 lines / no apply_patch tool. Extractor now handles both payload shapes uniformly via a `patchTextFromPayload` helper.

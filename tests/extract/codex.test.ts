@@ -132,3 +132,22 @@ describe("extractCodexPersonality (window with session_meta predating cutoff)", 
     expect(p.bashCommandsList).toEqual(["ls in-window"]);
   });
 });
+
+const APPLY_PATCH_CUSTOM = resolve(__dirname, "../fixtures/codex/apply-patch-custom-tool.jsonl");
+
+describe("extractCodexPersonality (apply_patch as custom_tool_call)", () => {
+  it("parses apply_patch from response_item/custom_tool_call.input", async () => {
+    const p = await extractCodexPersonality(APPLY_PATCH_CUSTOM);
+    expect(p.toolCounts.apply_patch).toBe(1);
+    expect(p.filesTouched).toContain("hello.txt");
+    expect(p.linesAdded).toBe(2);
+    expect(p.linesRemoved).toBe(0);
+  });
+
+  it("still counts function_call exec_command alongside custom_tool_call apply_patch", async () => {
+    const p = await extractCodexPersonality(APPLY_PATCH_CUSTOM);
+    expect(p.toolCounts.exec_command).toBe(1);
+    expect(p.bashCommands).toBe(1);
+    expect(p.bashCommandsList).toEqual(["wc -l hello.txt"]);
+  });
+});

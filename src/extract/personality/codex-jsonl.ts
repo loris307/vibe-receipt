@@ -67,14 +67,11 @@ const TOP_FILES_LIMIT = 5;
  * Apply-patch parser for unified-diff-ish text payloads (very forgiving).
  * Returns (filesTouched, linesAdded, linesRemoved).
  */
-function parseApplyPatch(payload: unknown): {
+function parsePatchText(patchText: string): {
   files: string[];
   added: number;
   removed: number;
 } {
-  if (!payload || typeof payload !== "object") return { files: [], added: 0, removed: 0 };
-  const patchText = (payload as any).patch;
-  if (typeof patchText !== "string") return { files: [], added: 0, removed: 0 };
   const files = new Set<string>();
   let added = 0;
   let removed = 0;
@@ -88,6 +85,33 @@ function parseApplyPatch(payload: unknown): {
     else if (line.startsWith("-") && !line.startsWith("---")) removed += 1;
   }
   return { files: Array.from(files), added, removed };
+}
+
+/**
+ * Codex emits apply_patch in two payload shapes depending on CLI version:
+ *   - response_item/function_call    → payload.arguments is a JSON string
+ *                                       wrapping `{ "patch": "<text>" }`
+ *   - response_item/custom_tool_call → payload.input is the raw patch text
+ *                                       (current default for `codex exec`)
+ * Returns the raw patch text or null if neither shape matched.
+ */
+function patchTextFromPayload(payload: any): string | null {
+  if (!payload) return null;
+  if (typeof payload.input === "string" && payload.input.includes("*** ")) {
+    return payload.input;
+  }
+  let parsed: any = payload.arguments;
+  if (typeof parsed === "string") {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      return null;
+    }
+  }
+  if (parsed && typeof parsed === "object" && typeof parsed.patch === "string") {
+    return parsed.patch;
+  }
+  return null;
 }
 
 function eventTimestamp(evt: any): number | null {
@@ -315,7 +339,9 @@ export async function extractCodexPersonality(
             out.shortestPromptText = text;
           }
         }
-      } else if (innerType === "function_call") {
+      } else if (innerType === "function_call" || innerType === "custom_tool_call") {
+        // Codex switched apply_patch from function_call to custom_tool_call in
+        // newer CLI versions; both share name + (arguments|input) so handle uniformly.
         const name = String(payload.name ?? "");
         if (!name) continue;
         out.toolCounts[name] = (out.toolCounts[name] ?? 0) + 1;
@@ -344,30 +370,25 @@ export async function extractCodexPersonality(
           }
         }
         if (name === "apply_patch") {
-          let parsed: any = payload.arguments;
-          if (typeof parsed === "string") {
-            try {
-              parsed = JSON.parse(parsed);
-            } catch {
-              parsed = null;
-            }
-          }
-          const result = parseApplyPatch(parsed);
-          for (const f of result.files) {
-            if (!fileMap.has(f)) fileMap.set(f, { added: 0, removed: 0, editCount: 0 });
-            fileMap.get(f)!.editCount += 1;
-          }
-          // Distribute additions/removals across all touched files (best-effort).
-          // For simplicity, attribute totals to the first file when 1, or all proportionally.
-          if (result.files.length === 1) {
-            const acc = fileMap.get(result.files[0]!)!;
-            acc.added += result.added;
-            acc.removed += result.removed;
-          } else if (result.files.length > 1) {
+          const patchText = patchTextFromPayload(payload);
+          if (patchText !== null) {
+            const result = parsePatchText(patchText);
             for (const f of result.files) {
-              const acc = fileMap.get(f)!;
-              acc.added += Math.floor(result.added / result.files.length);
-              acc.removed += Math.floor(result.removed / result.files.length);
+              if (!fileMap.has(f)) fileMap.set(f, { added: 0, removed: 0, editCount: 0 });
+              fileMap.get(f)!.editCount += 1;
+            }
+            // Distribute additions/removals across all touched files (best-effort).
+            // For simplicity, attribute totals to the first file when 1, or all proportionally.
+            if (result.files.length === 1) {
+              const acc = fileMap.get(result.files[0]!)!;
+              acc.added += result.added;
+              acc.removed += result.removed;
+            } else if (result.files.length > 1) {
+              for (const f of result.files) {
+                const acc = fileMap.get(f)!;
+                acc.added += Math.floor(result.added / result.files.length);
+                acc.removed += Math.floor(result.removed / result.files.length);
+              }
             }
           }
         }

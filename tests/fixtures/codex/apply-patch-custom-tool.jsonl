@@ -1,0 +1,7 @@
+{"type":"session_meta","payload":{"id":"019defc6-f9e5-7fc3-bb62-47b27c53558d","timestamp":"2026-05-03T23:38:08Z","cwd":"/tmp/vibe-codex-tools-smoke","originator":"codex-cli","cli_version":"0.128.0","model_provider":"openai"}}
+{"type":"turn_context","payload":{"cwd":"/tmp/vibe-codex-tools-smoke","model":"gpt-5.5","approval_policy":"never","sandbox_policy":"workspace-write"}}
+{"type":"event_msg","payload":{"type":"user_message","timestamp":"2026-05-03T23:38:08Z","message":"Create hello.txt with two lines."}}
+{"timestamp":"2026-05-03T23:38:26.514Z","type":"response_item","payload":{"type":"custom_tool_call","status":"completed","call_id":"call_123","name":"apply_patch","input":"*** Begin Patch\n*** Add File: hello.txt\n+hello\n+world\n*** End Patch\n"}}
+{"timestamp":"2026-05-03T23:38:26.550Z","type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"call_123","output":"{\"output\":\"Success. Updated the following files:\\nA hello.txt\\n\",\"metadata\":{\"exit_code\":0,\"duration_seconds\":0.0}}"}}
+{"timestamp":"2026-05-03T23:38:30Z","type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{\"cmd\":\"wc -l hello.txt\",\"workdir\":\"/tmp/vibe-codex-tools-smoke\"}","call_id":"call_456"}}
+{"type":"event_msg","payload":{"type":"token_count","timestamp":"2026-05-03T23:38:35Z","info":{"total_token_usage":{"input_tokens":9022,"cached_input_tokens":0,"output_tokens":959,"reasoning_output_tokens":0}}}}
