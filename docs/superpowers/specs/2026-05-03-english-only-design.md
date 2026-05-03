@@ -60,17 +60,9 @@ The German translation is a maintenance overhead Loris no longer wants to carry.
 1. `pnpm typecheck` — green.
 2. `pnpm test` — green (DE-specific tests removed; remaining tests use bare `strings`).
 3. `pnpm build` — green; `dist/cli.mjs` rebuilt.
-4. `node dist/cli.mjs --help` — output does not contain `--lang` or `de`.
-5. `grep -rn "VIBE BON\|--lang\|i18n/de\|pickLang\|de\.ts" src/ tests/ docs/ README.md` — returns zero matches. (Note: scope explicitly includes `docs/` per the docs/spec.md updates above.)
-6. Smoke render: `node dist/cli.mjs --json` against any existing session — emits a valid Receipt JSON, no errors.
-
-## Verification gate (must all pass)
-
-1. `pnpm typecheck` — green.
-2. `pnpm test` — green (DE-specific tests removed; remaining tests use bare `strings`).
-3. `pnpm build` — green; `dist/cli.mjs` rebuilt.
-4. `node dist/cli.mjs --help` — output does not contain `--lang` or `de`.
-5. `grep -rn "VIBE BON\|--lang\|i18n/de\|pickLang\|de\.ts" src/ tests/ README.md` — returns zero matches.
+4. `node dist/cli.mjs --help` — output does not contain the substring `--lang` (matched as a literal flag, not bare `de`, to avoid false positives on English words like "described").
+5. `grep -rn "VIBE BON\|--lang\|i18n/de\|pickLang\|de\.ts" src/ tests/ docs/ README.md --exclude='masterplan-v*.md'` — returns zero matches.
+   - `docs/masterplan-v0.2.md` and `docs/masterplan-v0.3.md` are explicitly excluded: they are frozen historical release plans that document the project as it was at the time of v0.2 / v0.3, including the German support that existed then. Rewriting them would falsify history.
 6. Smoke render: `node dist/cli.mjs --json` against any existing session — emits a valid Receipt JSON, no errors.
 
 ## Out of scope
