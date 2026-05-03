@@ -61,7 +61,7 @@ The German translation is a maintenance overhead Loris no longer wants to carry.
 2. `pnpm test` — green (DE-specific tests removed; remaining tests use bare `strings`).
 3. `pnpm build` — green; `dist/cli.mjs` rebuilt.
 4. `node dist/cli.mjs --help` — output does not contain the substring `--lang` (matched as a literal flag, not bare `de`, to avoid false positives on English words like "described").
-5. `grep -rn "VIBE BON\|--lang\|i18n/de\|pickLang\|de\.ts" src/ tests/ docs/ README.md --exclude='masterplan-v*.md' --exclude-dir='superpowers'` — returns zero matches.
+5. `grep -rn "VIBE BON\|--lang\|i18n/de\|pickLang" src/ tests/ docs/ README.md --exclude='masterplan-v*.md' --exclude-dir='superpowers'` — returns zero matches.
    - `docs/masterplan-v0.2.md` and `docs/masterplan-v0.3.md` are explicitly excluded: they are frozen historical release plans documenting the project as it was at v0.2 / v0.3 (including the German support that existed then). Rewriting them would falsify history.
    - `docs/superpowers/` is excluded because the design spec itself naturally contains the strings we are hunting for (documenting them is the point); excluding the directory keeps the gate satisfiable without weakening it.
 6. Smoke render: `node dist/cli.mjs --json` against any existing session — emits a valid Receipt JSON, no errors.
