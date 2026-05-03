@@ -69,7 +69,7 @@ The receipt is laid out in fixed sections. Every stat below is rendered exactly 
 | `cache hit` | `cache_read / (input + cache_create + cache_read)` as a percentage — how much of the prompt was served from prompt-cache. |
 | `longest solo` | Longest gap between two consecutive real user prompts (i.e. how long Claude/Codex worked alone). Shown only when > 1 minute. |
 | `peak burn` | Token-per-minute peak in a rolling 60-second window. Shown only when > 0. |
-| `rate limits` | `× N · wait` — number of HTTP 429 / `rate_limit_error` events plus the summed `retry-after`. Shown only when > 0. |
+| `rate limits` | `× N · <retry-after>` — number of HTTP 429 / `rate_limit_error` events plus the summed `retry-after` duration (e.g. `× 2 · 5m 30s`). Shown only when > 0. |
 | `compactions` | `× N · first @ X% ctx` — times `/compact` triggered and what fraction of the model's context window was filled at the first squeeze. Shown only when > 0. OG-skipped. |
 | `vs last` | Italic comparison line: `±X% tok · ±Y% $` versus the previous session of the same source from `~/.vibe-receipt/history.jsonl`. |
 | `week rank` | Italic comparison line: `N/M  🏆 longest of last 7 days` — your current session's token rank within the rolling 7-day window. |
@@ -127,7 +127,7 @@ Each row is shown only when its underlying value is non-trivial (typically > 0; 
 | `skills` | First three skills invoked via the `Skill` tool, comma-joined. |
 | `slash` | First three slash-commands the user typed (parsed from `<command-name>/foo` wrappers), comma-joined. |
 | `wait-then-go` | `× N` — number of times the user sent a new prompt while the assistant was still mid-stream / mid tool-use. |
-| `manners` | `N× please · N× thanks · N× sorry` — politeness word counts across all prompts (English + German patterns). Shown only when total > 0. |
+| `manners` | `N× please · N× thanks · N× sorry` — politeness word counts across all prompts (matches in English, German, French, and Spanish). Shown only when total > 0. |
 | `corrections` | `× N · X% of prompts` — count of prompts matching correction patterns ("nein, ich meinte…", "no, use X instead"). Shown only when > 0. OG-skipped. |
 
 ### PROMPTING
@@ -141,7 +141,7 @@ OG-skipped — this entire section is hidden on the OG preset.
 | `avg` | Mean user-prompt length, in chars. |
 | `first   "..."` | 60-char preview of the very first prompt. Hidden by default — shown only with `--reveal=prompt`. |
 | `shortest "..." (N chars)` | Full text of the shortest real prompt plus its char count (collapsed-whitespace, capped at 80 chars in the preview). Hidden by default — shown only with `--reveal=prompt`. |
-| `<mood> · sha:XXXXXX` | Mood glyph (`//` neutral, `!!` fire, `++` build, `??` think) plus a 6-char SHA-256 fingerprint of the first prompt. Always shown — the fingerprint is privacy-safe. |
+| `<mood> · sha:XXXXXX` | Mood glyph (`//` neutral, `!!` fire, `++` build, `??` think) plus a 6-char SHA-256 fingerprint of the first prompt. Shown whenever the PROMPTING section renders (i.e. every size preset except OG). The fingerprint is privacy-safe. |
 
 ### BADGES
 
@@ -159,7 +159,7 @@ Up to 3 achievements, ordered rarest-first. Shown only when at least one fires. 
 | 🛠 `Toolbox Master` | ≥ 50 tool calls total. |
 | 🌙 `Night Owl` | Session start hour is between 22:00 and 05:59 UTC. |
 | 📚 `Researcher` | Read/Grep/WebFetch/Glob dominate the tool mix (researcher score ≥ 0.5). |
-| 🐛 `Bug Hunter` | Bug keywords (fix/bug/broken/error/crash/wrong) appear in a high fraction of prompts (fixer score ≥ 0.5). |
+| 🐛 `Bug Hunter` | Bug keywords (fix, bug, broken, error, fail/failed/failing, crash, wrong, hak) appear in a high fraction of prompts (fixer score ≥ 0.5). |
 | 🙏 `Polite` | `please + thanks + sorry` ≥ 5 across all prompts. |
 
 ### ARCHETYPE
@@ -248,7 +248,7 @@ Receipts are screenshot-safe out of the box. Sensitive fields are redacted unles
 | Project path | basename only (`myrepo`, not `~/Desktop/clientwork/NDA/myrepo`) | `--reveal=paths` |
 | Git branch | first slash-segment + `…` (`feature/…`) | `--reveal=paths` |
 | File paths | filename only (`page.tsx` instead of `apps/secret/page.tsx`) | `--reveal=paths` |
-| First prompt | shown as `N words · mood-glyph · sha-fingerprint` only | `--reveal=prompt` |
+| First prompt | shown as `<mood-glyph> · sha:<fingerprint>` only | `--reveal=prompt` |
 | AFK recap text | replaced with `<recap hidden>` | `--reveal=prompt` |
 | Bash commands | omitted entirely | `--reveal=bash` |
 
@@ -341,7 +341,7 @@ Update — that was fixed in v0.1.x. Run `pnpm build` again.
 No. It only reads files that already exist on your disk. No API calls.
 
 **Do you upload anything?**
-No. Zero outbound network calls in render or extract paths. The only network call is ccusage's pricing-table fetch from LiteLLM (cached); set `VIBE_RECEIPT_OFFLINE=1` to disable even that.
+No. Zero outbound network calls in render or extract paths. The only network call is ccusage's pricing-table fetch from LiteLLM, which is cached on disk after the first run.
 
 **Can I share my receipt without leaking secrets?**
 Yes — that's the whole point. Default rendering hides paths, prompts, and bash commands. The ANSI preview shows you exactly what the PNG will contain before it's written.
@@ -356,7 +356,7 @@ Older versions counted subagent transcripts as separate sessions. Fixed in commi
 
 ## Roadmap
 
-- **v1.0** — Claude Code + Codex CLI sources · single + combine + window modes · hook · DE/EN ✓
+- **v1.0** — Claude Code + Codex CLI sources · single + combine + window modes · hook ✓
 - **v0.2** — history store, comparisons, archetypes, achievements ✓
 - **v0.3** — compactions, MCP servers, sidechain count, correction patterns ✓
 - **v1.1** — schema-drift canary, OG (1200×630) layout polish, optional AI-mood scoring (opt-in)
@@ -374,7 +374,7 @@ MIT — see [LICENSE](LICENSE).
 ## Credits
 
 - [`ccusage`](https://github.com/ryoppippi/ccusage) by [@ryoppippi](https://github.com/ryoppippi) — Claude Code data loader (MIT)
-- [Satori](https://github.com/vercel/satori) by Vercel — JSX → SVG renderer (MIT)
+- [Satori](https://github.com/vercel/satori) by Vercel — JSX → SVG renderer (MPL-2.0)
 - [`@resvg/resvg-js`](https://github.com/yisibl/resvg-js) — SVG → PNG (MPL-2.0)
 - [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) — bundled font (OFL-1.1)
 
