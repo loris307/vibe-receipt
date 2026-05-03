@@ -218,6 +218,14 @@ function ComparisonLine({
   );
 }
 
+// Tool-name column at 20px mono fits ~10 glyphs; truncate longer names so they
+// can't paint over the bar (satori doesn't clip overflow).
+const TOOL_NAME_MAX_CHARS = 10;
+function truncateToolName(name: string): string {
+  if (name.length <= TOOL_NAME_MAX_CHARS) return name;
+  return `${name.slice(0, TOOL_NAME_MAX_CHARS - 1)}…`;
+}
+
 function ToolBar({ tool, max }: { tool: ToolStat; max: number }) {
   const pct = max > 0 ? Math.max(0.05, tool.count / max) : 0;
   return (
@@ -244,7 +252,7 @@ function ToolBar({ tool, max }: { tool: ToolStat; max: number }) {
             color: theme.ink,
           }}
         >
-          {tool.name}
+          {truncateToolName(tool.name)}
         </span>
       </div>
       <div
