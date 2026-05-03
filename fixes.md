@@ -51,3 +51,9 @@ Fourth-pass (live tool-using `codex exec` session that called `apply_patch`):
 Fifth-pass (rendered the long-running ongoing session and noticed `corrections 6/6 = 100%`):
 
 - `\bactually[\s,]` (English) and `\beigentlich[\s,]` (German) treated *every* in-sentence use of those words as a correction, but both double as intensifiers ("you actually have to test it", "ich war eigentlich zufrieden"). Real prompt repeated 5× in a /loop conversation reported 100% correction rate. Patterns now fire only on sentence-initial, post-comma, or pronoun-prefixed forms. The same session re-renders as 2/6 (33%).
+
+Sixth-pass (drifted help text + hook receiver E2E):
+
+- `vibe-receipt help` was missing `history` from COMMANDS even though it's a real top-level command. `--out` default was documented as `<id>.png` but actual is `<id>-<size>.png`. Portrait was listed as `1080x1350` — actually `1080x1500` and auto-extends. Help text now matches behavior.
+
+Saturation point reached on 2026-05-04. Six audit passes (three static, three live end-to-end) found progressively narrower issues; the seventh pass turned up no real bugs (help-text drift was the only thing, fixed in pass six). Half-built `meta.inFlight` (renderer + schema + aggregator + spec all support it but no extractor sets it) is a feature gap left intentionally untouched per the "fix only what's broken" rule.
