@@ -165,10 +165,11 @@ export function buildCombinedReceipt(sessions: NormalizedSession[], scope: Recei
     compactionCount += s.compactionCount;
     sidechainEvents += s.sidechainEvents;
     correctionCount += s.correctionCount;
-    if (s.firstCompactPreTokens !== null) {
-      const ts = Number.isFinite(start) ? start : 0;
-      if (firstCompactCarrier === null || ts < firstCompactCarrier.startUtcMs) {
-        firstCompactCarrier = { startUtcMs: ts, ns: s };
+    if (s.firstCompactPreTokens !== null && Number.isFinite(start)) {
+      // Earliest finite-start session wins; sessions with bad timestamps are
+      // skipped rather than mapped to ts=0 (which would always win).
+      if (firstCompactCarrier === null || start < firstCompactCarrier.startUtcMs) {
+        firstCompactCarrier = { startUtcMs: start, ns: s };
       }
     }
     for (const m of s.mcpServers) {
@@ -209,10 +210,9 @@ export function buildCombinedReceipt(sessions: NormalizedSession[], scope: Recei
     for (const m of s.models) modelSet.add(m);
     sourceSet.add(s.source);
 
-    if (s.firstPrompt) {
-      const ts = Number.isFinite(start) ? start : 0;
-      if (!firstPromptCandidate || ts < firstPromptCandidate.ts) {
-        firstPromptCandidate = { ts, text: s.firstPrompt };
+    if (s.firstPrompt && Number.isFinite(start)) {
+      if (!firstPromptCandidate || start < firstPromptCandidate.ts) {
+        firstPromptCandidate = { ts: start, text: s.firstPrompt };
       }
     }
 

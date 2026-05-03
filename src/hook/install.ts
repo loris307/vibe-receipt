@@ -21,6 +21,24 @@ function entryReferencesUs(entry: HookEntry): boolean {
   return (entry.hooks ?? []).some((h) => h.command?.includes("vibe-receipt"));
 }
 
+/**
+ * Pull `hooks.SessionEnd` defensively. If the user (or a future Claude Code
+ * version) put a non-array value here, refuse rather than crash on `.some()`
+ * or silently overwrite via the `?? []` shortcut. Returns either the array,
+ * an empty array if missing, or an error describing the unexpected shape.
+ */
+function readSessionEndArray(
+  data: any,
+): { ok: true; entries: HookEntry[] } | { ok: false; error: string } {
+  const raw = data?.hooks?.SessionEnd;
+  if (raw === undefined || raw === null) return { ok: true, entries: [] };
+  if (Array.isArray(raw)) return { ok: true, entries: raw as HookEntry[] };
+  return {
+    ok: false,
+    error: `hooks.SessionEnd must be an array (got ${typeof raw}). Refusing to overwrite — please fix or remove the entry manually in ${SETTINGS_PATH}.`,
+  };
+}
+
 function ensureFileExists() {
   if (!existsSync(SETTINGS_PATH)) {
     mkdirSync(dirname(SETTINGS_PATH), { recursive: true });
@@ -38,7 +56,12 @@ export async function installHook(): Promise<number> {
     return 1;
   }
 
-  const sessionEnd: HookEntry[] = parsed.data?.hooks?.SessionEnd ?? [];
+  const sessionEndCheck = readSessionEndArray(parsed.data);
+  if (!sessionEndCheck.ok) {
+    process.stderr.write(`error: ${sessionEndCheck.error}\n`);
+    return 1;
+  }
+  const sessionEnd = sessionEndCheck.entries;
   if (sessionEnd.some(entryReferencesUs)) {
     process.stdout.write("vibe-receipt SessionEnd hook is already installed.\n");
     return 0;
@@ -96,7 +119,12 @@ export async function uninstallHook(): Promise<number> {
     process.stderr.write(`error: ${(e as Error).message}\n`);
     return 1;
   }
-  const sessionEnd: HookEntry[] = parsed.data?.hooks?.SessionEnd ?? [];
+  const sessionEndCheck = readSessionEndArray(parsed.data);
+  if (!sessionEndCheck.ok) {
+    process.stderr.write(`error: ${sessionEndCheck.error}\n`);
+    return 1;
+  }
+  const sessionEnd = sessionEndCheck.entries;
   // Prune our children per-entry, then drop entries that became empty.
   const updated = sessionEnd
     .map((e) => (entryReferencesUs(e) ? pruneEntry(e) : e))
@@ -123,8 +151,12 @@ export async function hookStatus(): Promise<number> {
   }
   try {
     const { data } = readSettings();
-    const sessionEnd: HookEntry[] = data?.hooks?.SessionEnd ?? [];
-    const installed = sessionEnd.some(entryReferencesUs);
+    const check = readSessionEndArray(data);
+    if (!check.ok) {
+      process.stderr.write(`error: ${check.error}\n`);
+      return 1;
+    }
+    const installed = check.entries.some(entryReferencesUs);
     process.stdout.write(
       installed
         ? `installed at ${SETTINGS_PATH}\n`

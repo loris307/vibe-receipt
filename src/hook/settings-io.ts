@@ -19,8 +19,15 @@ export function readSettings(): { raw: string; data: any } {
   return { raw, data: data ?? {} };
 }
 
+/**
+ * Snapshot the user's current settings.json to BACKUP_PATH before we mutate it.
+ * Only runs when no backup yet exists — re-running install/uninstall must not
+ * overwrite the original (pre-vibe-receipt) state, which is the file's whole
+ * reason for existing.
+ */
 export function backupSettings(_raw: string) {
   if (!existsSync(SETTINGS_PATH)) return;
+  if (existsSync(BACKUP_PATH)) return;
   copyFileSync(SETTINGS_PATH, BACKUP_PATH);
 }
 
