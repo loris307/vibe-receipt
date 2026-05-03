@@ -32,3 +32,10 @@ Subsequent render polish (also fixed):
 
 - Badge emoji glyphs rendered as tofu boxes in PNG (bundled mono font lacks emoji coverage) — replaced with ASCII glyphs
 - Long tool names like `exec_command` painted over the bar chart — truncated to fit the name column
+
+Second-pass audit (also fixed):
+
+- Codex window mode dropped sessions whose `session_meta` predated the cutoff and over-counted tokens because `token_count` is cumulative — added a metadata pre-pass and a baseline subtraction
+- `installHook`/`uninstallHook` cast `hooks.SessionEnd` without `Array.isArray` validation — would crash or silently overwrite on a malformed value; now refuses with a clear error
+- `backupSettings` overwrote `.bak` on every run, destroying the user's original pre-vibe-receipt state after the first round-trip — now writes the backup once and never overwrites
+- `combine` selected `firstPrompt` (and `firstCompactCarrier`) from sessions with non-finite `startUtc` because they were mapped to `ts=0` — those sessions are now skipped
