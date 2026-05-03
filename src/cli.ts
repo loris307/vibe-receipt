@@ -35,7 +35,7 @@ import { isHistoryDisabled, readHistory } from "./history/store.js";
 import { hookStatus, installHook, uninstallHook } from "./hook/install.js";
 import { handleHookReceive } from "./hook/on-session-end.js";
 import { listSourcesSummary } from "./hook/sources-summary.js";
-import { pickLang, strings } from "./i18n/index.js";
+import { strings } from "./i18n/index.js";
 import { applyRedaction, parseRevealFlag, withRawPrompt } from "./redact/smart-redact.js";
 import { renderAnsi } from "./render/ansi.js";
 import { renderPng } from "./render/png.js";
@@ -110,7 +110,6 @@ FLAGS
   --reveal paths|prompt|bash|all   opt out of smart-redact
   --review                   show preview, prompt y/N before writing PNG
   --json                     emit raw Receipt JSON to stdout instead of PNG
-  --lang en|de               label language (default: auto from $LANG)
 
 EXAMPLES
   npx vibe-receipt
@@ -169,8 +168,7 @@ async function emit(opts: {
 }): Promise<void> {
   const { flags, rawFirstPrompt } = opts;
   const reveal = parseRevealFlag(typeof flags.reveal === "string" ? flags.reveal : undefined);
-  const lang = pickLang(typeof flags.lang === "string" ? flags.lang : null);
-  const sStrings = strings(lang);
+  const sStrings = strings;
   const sizes: SizePreset[] = parseSizeFlag(
     typeof flags.size === "string" ? flags.size : undefined,
   );

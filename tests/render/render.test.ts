@@ -21,7 +21,7 @@ describe("renderPng (real Satori → resvg)", () => {
   it("renders a portrait PNG for a Claude session", async () => {
     const ns = await loadClaudeFromFile(SHORT);
     const r = applyRedaction(buildSingleReceipt(ns));
-    const png = await renderPng({ receipt: r, s: strings("en"), size: "portrait" });
+    const png = await renderPng({ receipt: r, s: strings, size: "portrait" });
     expect(png.length).toBeGreaterThan(5_000);
     // Valid PNG signature
     expect(png.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
@@ -31,7 +31,7 @@ describe("renderPng (real Satori → resvg)", () => {
   it("renders an OG (1200x630) PNG", async () => {
     const ns = await loadClaudeFromFile(SHORT);
     const r = applyRedaction(buildSingleReceipt(ns));
-    const png = await renderPng({ receipt: r, s: strings("en"), size: "og" });
+    const png = await renderPng({ receipt: r, s: strings, size: "og" });
     expect(png.length).toBeGreaterThan(5_000);
     writeFileSync(resolve(OUT_DIR, "snap-claude-og.png"), png);
   });
@@ -39,17 +39,9 @@ describe("renderPng (real Satori → resvg)", () => {
   it("renders a story (1080x1920) PNG", async () => {
     const ns = await loadClaudeFromFile(SHORT);
     const r = applyRedaction(buildSingleReceipt(ns));
-    const png = await renderPng({ receipt: r, s: strings("en"), size: "story" });
+    const png = await renderPng({ receipt: r, s: strings, size: "story" });
     expect(png.length).toBeGreaterThan(5_000);
     writeFileSync(resolve(OUT_DIR, "snap-claude-story.png"), png);
-  });
-
-  it("renders DE labels", async () => {
-    const ns = await loadClaudeFromFile(SHORT);
-    const r = applyRedaction(buildSingleReceipt(ns));
-    const png = await renderPng({ receipt: r, s: strings("de"), size: "portrait" });
-    expect(png.length).toBeGreaterThan(5_000);
-    writeFileSync(resolve(OUT_DIR, "snap-claude-portrait-de.png"), png);
   });
 
   it("renders a combined Claude + Codex receipt", async () => {
@@ -58,7 +50,7 @@ describe("renderPng (real Satori → resvg)", () => {
     const r = applyRedaction(
       buildCombinedReceipt([c, x], { kind: "combine-since", since: "PT1H" }),
     );
-    const png = await renderPng({ receipt: r, s: strings("en"), size: "portrait" });
+    const png = await renderPng({ receipt: r, s: strings, size: "portrait" });
     expect(png.length).toBeGreaterThan(5_000);
     writeFileSync(resolve(OUT_DIR, "snap-combined-portrait.png"), png);
   });
@@ -68,17 +60,10 @@ describe("renderAnsi", () => {
   it("renders a non-empty ANSI preview", async () => {
     const ns = await loadClaudeFromFile(SHORT);
     const r = applyRedaction(buildSingleReceipt(ns));
-    const ansi = renderAnsi(r, strings("en"));
+    const ansi = renderAnsi(r, strings);
     expect(ansi.length).toBeGreaterThan(200);
     expect(ansi).toContain("VIBE RECEIPT");
     expect(ansi).toContain("SESSION");
   });
 
-  it("renders DE labels in ANSI", async () => {
-    const ns = await loadClaudeFromFile(SHORT);
-    const r = applyRedaction(buildSingleReceipt(ns));
-    const ansi = renderAnsi(r, strings("de"));
-    expect(ansi).toContain("VIBE BON");
-    expect(ansi).toContain("ARBEIT");
-  });
 });
