@@ -34,7 +34,7 @@ pnpm build       # or: npm run build
 node dist/cli.mjs
 ```
 
-That's it. You'll see a terminal preview, and a PNG saved to `./vibe-receipts/<session-id>.png`.
+That's it. You'll see a terminal preview, and a PNG saved to `./vibe-receipts/<session-id>-<size>.png` (default size is `portrait`).
 
 > **Want to type just `vibe-receipt` from anywhere?** Run `pnpm link --global` once in the repo. Reverse with `pnpm unlink --global vibe-receipt`.
 
@@ -224,7 +224,7 @@ vibe-receipt year                        # current calendar year
 
 # Output formats — different sizes always produce different files (suffix in name)
 vibe-receipt --size portrait    # default · 1080×min 1500, auto-extends if heavy content
-vibe-receipt --size story       # 1080×1920 fixed · IG/TikTok story
+vibe-receipt --size story       # 1080×min 1920, auto-extends if heavy content · IG/TikTok story
 vibe-receipt --size og          # 1200×630 fixed · link-unfurl preview
 vibe-receipt --size all         # writes all three (no overwriting)
 
