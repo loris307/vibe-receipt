@@ -106,6 +106,8 @@ export const AchievementSchema = v.object({
   key: v.string(),
   labelKey: v.string(),
   iconGlyph: v.string(),
+  // PNG-safe ASCII glyph; the bundled mono font has no emoji coverage
+  asciiGlyph: v.string(),
 });
 export type Achievement = v.InferOutput<typeof AchievementSchema>;
 

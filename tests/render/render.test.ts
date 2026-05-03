@@ -65,5 +65,4 @@ describe("renderAnsi", () => {
     expect(ansi).toContain("VIBE RECEIPT");
     expect(ansi).toContain("SESSION");
   });
-
 });

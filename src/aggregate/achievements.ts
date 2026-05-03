@@ -3,6 +3,7 @@ import type { Achievement, Receipt } from "../data/receipt-schema.js";
 interface Rule {
   key: string;
   glyph: string;
+  ascii: string;
   trigger: (r: Receipt) => boolean;
 }
 
@@ -18,26 +19,31 @@ const CATALOG: Rule[] = [
   {
     key: "token-millionaire",
     glyph: "🏆",
+    ascii: "$$$",
     trigger: (r) => TOTAL_TOKENS(r) >= 1_000_000,
   },
   {
     key: "big-spender",
     glyph: "💸",
+    ascii: "$$",
     trigger: (r) => r.cost.totalUsd >= 5,
   },
   {
     key: "marathoner",
     glyph: "🏃",
+    ascii: ">>>",
     trigger: (r) => r.time.durationMs >= 2 * 3600_000,
   },
   {
     key: "auto-pilot",
     glyph: "🤝",
+    ascii: "[A]",
     trigger: (r) => r.time.longestSoloStretchMs >= 5 * 60_000,
   },
   {
     key: "deep-thinker",
     glyph: "🧠",
+    ascii: "[?]",
     trigger: (r) => {
       const active = r.time.activeMs > 0 ? r.time.activeMs : r.time.durationMs;
       return active > 0 && r.personality.thinkingMs / active >= 0.5;
@@ -46,6 +52,7 @@ const CATALOG: Rule[] = [
   {
     key: "no-error-streak",
     glyph: "🔥",
+    ascii: "[!]",
     trigger: (r) =>
       r.cost.rateLimitHits === 0 &&
       r.personality.escInterrupts === 0 &&
@@ -55,16 +62,19 @@ const CATALOG: Rule[] = [
   {
     key: "sprinter",
     glyph: "⚡",
+    ascii: ">>",
     trigger: (r) => r.time.durationMs < 15 * 60_000 && r.tools.total >= 30,
   },
   {
     key: "toolbox-master",
     glyph: "🛠",
+    ascii: "[T]",
     trigger: (r) => r.tools.total >= 50,
   },
   {
     key: "night-owl",
     glyph: "🌙",
+    ascii: "(C",
     trigger: (r) => {
       // UTC-based for determinism (matches archetype rule + header timestamp)
       const h = Number.parseInt(r.time.startUtc.slice(11, 13), 10);
@@ -74,16 +84,19 @@ const CATALOG: Rule[] = [
   {
     key: "researcher",
     glyph: "📚",
+    ascii: "[R]",
     trigger: (r) => (r.archetype.scores.researcher ?? 0) >= 0.5,
   },
   {
     key: "bug-hunter",
     glyph: "🐛",
+    ascii: "[B]",
     trigger: (r) => (r.archetype.scores.fixer ?? 0) >= 0.5,
   },
   {
     key: "polite",
     glyph: "🙏",
+    ascii: "[P]",
     trigger: (r) => r.personality.politenessScore.total >= 5,
   },
 ];
@@ -104,6 +117,7 @@ export function deriveAchievements(receipt: Receipt): Achievement[] {
       key: rule.key,
       labelKey: `achievement.${rule.key}.label`,
       iconGlyph: rule.glyph,
+      asciiGlyph: rule.ascii,
     });
     if (fired.length >= MAX_BADGES) break;
   }

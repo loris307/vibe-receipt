@@ -1,5 +1,5 @@
 import * as React from "react";
-import type { Receipt, Subagent, ToolStat } from "../data/receipt-schema.js";
+import type { Receipt, ToolStat } from "../data/receipt-schema.js";
 import type { Strings } from "../i18n/index.js";
 import { truncateShortestText } from "../redact/smart-redact.js";
 import { compactNumber, formatPercent, formatUsd } from "../util/compact-number.js";
@@ -285,41 +285,6 @@ function ToolBar({ tool, max }: { tool: ToolStat; max: number }) {
           {tool.count}×
         </span>
       </div>
-    </div>
-  );
-}
-
-function SubagentLine({ a }: { a: Subagent }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "row",
-        justifyContent: "space-between",
-        marginBottom: 6,
-        width: "100%",
-      }}
-    >
-      <span
-        style={{
-          fontFamily: theme.monoFamily,
-          fontWeight: 400,
-          fontSize: 20,
-          color: theme.ink,
-        }}
-      >
-        {`> ${a.type}`}
-      </span>
-      <span
-        style={{
-          fontFamily: theme.monoFamily,
-          fontWeight: 400,
-          fontSize: 20,
-          color: theme.inkSoft,
-        }}
-      >
-        {formatDurationMs(a.durationMs)} · {compactNumber(a.totalTokens)} tok
-      </span>
     </div>
   );
 }
@@ -825,7 +790,16 @@ export function VibeCard({ receipt, s, size, height }: CardProps): React.ReactEl
                     borderRadius: 6,
                   }}
                 >
-                  <span style={{ fontSize: 22 }}>{a.iconGlyph}</span>
+                  <span
+                    style={{
+                      fontFamily: theme.monoFamily,
+                      fontWeight: 700,
+                      fontSize: 18,
+                      color: theme.accent,
+                    }}
+                  >
+                    {a.asciiGlyph}
+                  </span>
                   <span
                     style={{
                       fontFamily: theme.monoFamily,
