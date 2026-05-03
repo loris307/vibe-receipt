@@ -101,18 +101,102 @@ export interface ExtractOpts {
   sinceMs?: number;
 }
 
+/** Read cumulative tokens off a token_count event, regardless of nesting shape. */
+function readCumulativeTokens(payload: any): {
+  input: number;
+  cached: number;
+  output: number;
+  reasoning: number;
+} | null {
+  const info = payload?.info;
+  const tot =
+    info && typeof info === "object" && info.total_token_usage
+      ? info.total_token_usage
+      : info && typeof info === "object" && info.last_token_usage
+        ? info.last_token_usage
+        : null;
+  if (tot && typeof tot === "object") {
+    return {
+      input: Number(tot.input_tokens ?? 0),
+      cached: Number(tot.cached_input_tokens ?? 0),
+      output: Number(tot.output_tokens ?? 0),
+      reasoning: Number(tot.reasoning_output_tokens ?? 0),
+    };
+  }
+  if (
+    payload &&
+    (payload.input_tokens != null ||
+      payload.cached_input_tokens != null ||
+      payload.output_tokens != null ||
+      payload.reasoning_output_tokens != null)
+  ) {
+    return {
+      input: Number(payload.input_tokens ?? 0),
+      cached: Number(payload.cached_input_tokens ?? 0),
+      output: Number(payload.output_tokens ?? 0),
+      reasoning: Number(payload.reasoning_output_tokens ?? 0),
+    };
+  }
+  return null;
+}
+
 export async function extractCodexPersonality(
   filePath: string,
   opts: ExtractOpts = {},
 ): Promise<CodexPersonality> {
   const allEvents = await readJsonlAll<any>(filePath);
+  const sinceMs = typeof opts.sinceMs === "number" ? opts.sinceMs : null;
+
+  // Pass 1: collect session-level metadata (session_meta + first turn_context's
+  // model/cwd live near the start of the file and would be filtered out by a
+  // since cutoff) and a token baseline (last cumulative totals strictly before
+  // the cutoff, so in-window tokens = lastInWindow - baseline).
+  const metaModelSet = new Set<string>();
+  let metaSessionId: string | null = null;
+  let metaCwd: string | null = null;
+  let metaCliVersion: string | null = null;
+  let baselineInput = 0;
+  let baselineCached = 0;
+  let baselineOutput = 0;
+  let baselineReasoning = 0;
+  if (sinceMs !== null) {
+    for (const evt of allEvents) {
+      if (!evt || typeof evt !== "object") continue;
+      const ts = eventTimestamp(evt);
+      const inWindow = ts !== null && ts >= sinceMs;
+      const payload = evt.payload ?? {};
+      if (evt.type === "session_meta") {
+        if (typeof payload.id === "string" && metaSessionId === null) metaSessionId = payload.id;
+        if (typeof payload.cwd === "string" && metaCwd === null) metaCwd = payload.cwd;
+        if (typeof payload.cli_version === "string" && metaCliVersion === null)
+          metaCliVersion = payload.cli_version;
+      } else if (evt.type === "turn_context") {
+        if (typeof payload.model === "string") metaModelSet.add(payload.model);
+        if (typeof payload.cwd === "string" && metaCwd === null) metaCwd = payload.cwd;
+      } else if (
+        evt.type === "event_msg" &&
+        payload.type === "token_count" &&
+        ts !== null &&
+        !inWindow
+      ) {
+        const tot = readCumulativeTokens(payload);
+        if (tot) {
+          baselineInput = tot.input;
+          baselineCached = tot.cached;
+          baselineOutput = tot.output;
+          baselineReasoning = tot.reasoning;
+        }
+      }
+    }
+  }
+
   const events =
-    typeof opts.sinceMs === "number"
+    sinceMs !== null
       ? allEvents.filter((e) => {
           const ts = e?.payload?.timestamp ?? e?.timestamp;
           if (typeof ts !== "string") return false;
           const t = new Date(ts).getTime();
-          return Number.isFinite(t) && t >= opts.sinceMs!;
+          return Number.isFinite(t) && t >= sinceMs;
         })
       : allEvents;
 
@@ -163,7 +247,15 @@ export async function extractCodexPersonality(
     correctionCount: 0,
   };
 
-  if (events.length === 0) return out;
+  if (events.length === 0) {
+    if (sinceMs !== null) {
+      out.sessionId = metaSessionId;
+      out.cwd = metaCwd;
+      out.cliVersion = metaCliVersion;
+      out.models = Array.from(metaModelSet);
+    }
+    return out;
+  }
 
   const fileMap = new Map<string, { added: number; removed: number; editCount: number }>();
   const modelSet = new Set<string>();
@@ -289,25 +381,12 @@ export async function extractCodexPersonality(
     if (type === "event_msg") {
       const innerType = payload.type;
       if (innerType === "token_count") {
-        // Current Codex (>= ~0.125): cumulative totals nested under payload.info.total_token_usage.
-        // Legacy fixture shape: top-level payload.input_tokens etc.
-        const info = payload.info;
-        const tot =
-          info && typeof info === "object" && info.total_token_usage
-            ? info.total_token_usage
-            : info && typeof info === "object" && info.last_token_usage
-              ? info.last_token_usage
-              : null;
-        if (tot && typeof tot === "object") {
-          lastInput = Number(tot.input_tokens ?? lastInput);
-          lastCachedInput = Number(tot.cached_input_tokens ?? lastCachedInput);
-          lastOutput = Number(tot.output_tokens ?? lastOutput);
-          lastReasoning = Number(tot.reasoning_output_tokens ?? lastReasoning);
-        } else {
-          lastInput = Number(payload.input_tokens ?? lastInput);
-          lastCachedInput = Number(payload.cached_input_tokens ?? lastCachedInput);
-          lastOutput = Number(payload.output_tokens ?? lastOutput);
-          lastReasoning = Number(payload.reasoning_output_tokens ?? lastReasoning);
+        const tot = readCumulativeTokens(payload);
+        if (tot) {
+          lastInput = tot.input;
+          lastCachedInput = tot.cached;
+          lastOutput = tot.output;
+          lastReasoning = tot.reasoning;
         }
       } else if (innerType === "user_message" && typeof payload.message === "string") {
         // Current Codex shape: real user prompt is event_msg/user_message with payload.message.
@@ -327,11 +406,27 @@ export async function extractCodexPersonality(
     }
   }
 
-  out.inputTokens = lastInput;
-  out.cachedInputTokens = lastCachedInput;
-  out.outputTokens = lastOutput;
-  out.reasoningOutputTokens = lastReasoning;
-  out.models = Array.from(modelSet);
+  if (sinceMs !== null) {
+    // Window mode: tokens are cumulative session-wide; subtract pre-window
+    // baseline so the receipt only reflects work done inside the window.
+    out.inputTokens = Math.max(0, lastInput - baselineInput);
+    out.cachedInputTokens = Math.max(0, lastCachedInput - baselineCached);
+    out.outputTokens = Math.max(0, lastOutput - baselineOutput);
+    out.reasoningOutputTokens = Math.max(0, lastReasoning - baselineReasoning);
+    // Window mode: prefer session metadata captured outside the window over
+    // anything we picked up from in-window events.
+    if (metaSessionId !== null) out.sessionId = metaSessionId;
+    if (metaCwd !== null && !out.cwd) out.cwd = metaCwd;
+    if (metaCliVersion !== null) out.cliVersion = metaCliVersion;
+    const mergedModels = new Set<string>([...metaModelSet, ...modelSet]);
+    out.models = Array.from(mergedModels);
+  } else {
+    out.inputTokens = lastInput;
+    out.cachedInputTokens = lastCachedInput;
+    out.outputTokens = lastOutput;
+    out.reasoningOutputTokens = lastReasoning;
+    out.models = Array.from(modelSet);
+  }
 
   if (firstTs !== null && lastTs !== null) {
     out.startUtc = new Date(firstTs).toISOString();

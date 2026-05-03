@@ -1,0 +1,8 @@
+{"type":"session_meta","payload":{"id":"019fffff-aaaa-7bbb-cccc-ddddddddeeee","timestamp":"2026-05-01T10:00:00Z","cwd":"/Users/test/Projekte/long","originator":"codex-cli","cli_version":"1.2.3","model_provider":"openai","instructions":"base"}}
+{"type":"turn_context","payload":{"cwd":"/Users/test/Projekte/long","model":"gpt-5.5","approval_policy":"on-request","sandbox_policy":"default"}}
+{"type":"response_item","payload":{"type":"user_message","text":"early prompt before window","timestamp":"2026-05-01T10:00:30Z"}}
+{"type":"event_msg","payload":{"type":"token_count","timestamp":"2026-05-01T10:05:00Z","info":{"total_token_usage":{"input_tokens":100,"cached_input_tokens":40,"output_tokens":50,"reasoning_output_tokens":10}}}}
+{"type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{\"cmd\":\"ls before-window\"}","call_id":"call_pre","timestamp":"2026-05-01T10:10:00Z"}}
+{"type":"event_msg","payload":{"type":"user_message","timestamp":"2026-05-01T19:00:00Z","message":"in-window prompt"}}
+{"type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{\"cmd\":\"ls in-window\"}","call_id":"call_post","timestamp":"2026-05-01T19:00:30Z"}}
+{"type":"event_msg","payload":{"type":"token_count","timestamp":"2026-05-01T19:01:00Z","info":{"total_token_usage":{"input_tokens":300,"cached_input_tokens":120,"output_tokens":150,"reasoning_output_tokens":30}}}}

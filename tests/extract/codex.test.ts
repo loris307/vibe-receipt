@@ -90,3 +90,37 @@ describe("extractCodexPersonality (new Codex shape, v0.128+)", () => {
     expect(ns.inputTokens).toBe(2000);
   });
 });
+
+const LONG_PRE = resolve(__dirname, "../fixtures/codex/long-session-with-meta-before-window.jsonl");
+
+describe("extractCodexPersonality (window with session_meta predating cutoff)", () => {
+  // sinceMs at 14:00 UTC: session_meta is at 10:00 (BEFORE cutoff),
+  // but the session continues working into the window with prompts and tools at 19:00.
+  const sinceMs = Date.parse("2026-05-01T14:00:00Z");
+
+  it("captures session_meta even when it predates the window", async () => {
+    const p = await extractCodexPersonality(LONG_PRE, { sinceMs });
+    expect(p.sessionId).toBe("019fffff-aaaa-7bbb-cccc-ddddddddeeee");
+    expect(p.cwd).toBe("/Users/test/Projekte/long");
+    expect(p.cliVersion).toBe("1.2.3");
+    expect(p.models).toContain("gpt-5.5");
+  });
+
+  it("attributes only in-window deltas to cumulative token totals", async () => {
+    const p = await extractCodexPersonality(LONG_PRE, { sinceMs });
+    // Pre-window cumulative: input=100, cached=40, out=50, reason=10
+    // End-of-session cumulative: input=300, cached=120, out=150, reason=30
+    // Window delta: input=200, cached=80, out=100, reason=20
+    expect(p.inputTokens).toBe(200);
+    expect(p.cachedInputTokens).toBe(80);
+    expect(p.outputTokens).toBe(100);
+    expect(p.reasoningOutputTokens).toBe(20);
+  });
+
+  it("only counts in-window prompts and bash commands", async () => {
+    const p = await extractCodexPersonality(LONG_PRE, { sinceMs });
+    expect(p.promptTexts).toEqual(["in-window prompt"]);
+    expect(p.bashCommands).toBe(1);
+    expect(p.bashCommandsList).toEqual(["ls in-window"]);
+  });
+});
