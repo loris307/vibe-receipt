@@ -91,6 +91,7 @@ COMMANDS
   today                      All sessions started today
   week                       Last 7 days
   year                       Calendar year
+  history [list|clear|export]  Manage the local session history store
   install-hook               Add SessionEnd hook to ~/.claude/settings.json
   uninstall-hook             Remove the SessionEnd hook
   hook-status                Show whether the hook is installed
@@ -99,13 +100,13 @@ COMMANDS
   help                       Print this help
 
 FLAGS
-  --session <uuid>           Render a specific session
+  --session <uuid>           Render a specific session (short prefix ok)
   --source claude|codex      Restrict source for default-mode picker
   --since <duration>         e.g. 1h, 30m, 2d         (combine only)
   --branch <name>            e.g. feature/oss-saint   (combine only)
   --cwd <path>               absolute or relative      (combine only)
-  --out <path>               PNG output path (default: ./vibe-receipts/<id>.png)
-  --size portrait|story|og|all   default: portrait (1080x1350)
+  --out <path>               PNG output path (default: ./vibe-receipts/<id>-<size>.png)
+  --size portrait|story|og|all   default: portrait (1080x1500, auto-extends)
   --no-preview               skip the ANSI terminal preview
   --reveal paths|prompt|bash|all   opt out of smart-redact
   --review                   show preview, prompt y/N before writing PNG
