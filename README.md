@@ -48,7 +48,7 @@ The receipt is laid out in fixed sections. Every stat below is rendered exactly 
 
 | Stat | Explanation |
 |---|---|
-| `VIBE RECEIPT` | Masthead at the top. Renders as `VIBE BON` under `--lang de`. |
+| `VIBE RECEIPT` | Masthead at the top. |
 | `monospace receipt` | Tagline below the masthead. |
 | `· in flight` | Appended to the tagline when the session is still running. |
 | `session` / `combined · N` / `today` / `this week` / `year YYYY` | Mode badge in the top-right corner. Reflects whether you ran `show`, `combine`, `today`, `week`, or `year`. |
@@ -306,12 +306,6 @@ vibe-receipt reads existing JSONL session logs that Claude Code and Codex CLI al
 Token + cost computation is sourced from:
 1. [`ccusage`](https://github.com/ryoppippi/ccusage) when its LiteLLM-fetched pricing table has the model
 2. A bundled fallback table (`src/extract/claude-pricing.ts`) for fresh models LiteLLM hasn't picked up yet — currently calibrated against [Anthropic's official pricing page](https://platform.claude.com/docs/en/about-claude/pricing) (verified May 2026)
-
----
-
-## Languages
-
-English by default. German variant via `--lang de` (renames the masthead to **VIBE BON**, all section headers translated).
 
 ---
 
