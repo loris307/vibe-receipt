@@ -60,6 +60,32 @@ describe("v0.3 — countCorrections (unit)", () => {
     expect(countCorrections(["Actually, I meant the other one"])).toBe(1);
   });
 
+  it("matches 'I actually meant' (pronoun-prefixed actually)", () => {
+    expect(countCorrections(["I actually wanted the other one"])).toBe(1);
+  });
+
+  it("matches mid-sentence 'wait, actually,'", () => {
+    expect(countCorrections(["wait, actually, use the other approach"])).toBe(1);
+  });
+
+  it("does NOT match descriptive 'actually' as intensifier", () => {
+    // Real-world false positive: a /loop-style prompt repeatedly using
+    // "you actually have to test it" used to flag every prompt as a correction.
+    expect(
+      countCorrections(["You can try fix things yourself but you always have to actually test it"]),
+    ).toBe(0);
+    expect(countCorrections(["This is actually a great idea"])).toBe(0);
+  });
+
+  it("does NOT match descriptive 'eigentlich' as intensifier", () => {
+    expect(countCorrections(["ich war eigentlich zufrieden"])).toBe(0);
+    expect(countCorrections(["das ist eigentlich gut"])).toBe(0);
+  });
+
+  it("still matches sentence-initial 'eigentlich,'", () => {
+    expect(countCorrections(["Eigentlich, mach das anders"])).toBe(1);
+  });
+
   it("matches 'use X instead of Y'", () => {
     expect(countCorrections(["use uv instead of pip"])).toBe(1);
   });

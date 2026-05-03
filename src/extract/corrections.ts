@@ -14,7 +14,10 @@ const CORRECTION_PATTERNS: ReadonlyArray<RegExp> = [
   /^\s*doch[\s,!.]/iu, // "Doch, ..." sentence-initial contradiction
   /\bdoch\s+nur\b/iu, // "ich wollte doch nur"
   /\bich\s+meine\b/iu, // "Ich meine ..."
-  /\beigentlich[\s,]/iu, // "eigentlich, ..."
+  // "eigentlich" is also an intensifier ("ich war eigentlich zufrieden");
+  // require sentence-initial or post-comma to bias toward corrective uses.
+  /^\s*eigentlich[\s,]/iu,
+  /,\s*eigentlich[\s,]/iu,
   /^\s*aber\s/iu, // "Aber, ..." sentence-initial
   /\bsondern\b/iu, // "X, sondern Y"
   /\bnicht\s+so[\s,]/iu, // "nicht so, sondern..."
@@ -22,7 +25,12 @@ const CORRECTION_PATTERNS: ReadonlyArray<RegExp> = [
 
   // English — equivalent set
   /^\s*no[\s,!.]/iu, // "No, ..." sentence-initial
-  /\bactually[\s,]/iu, // "Actually, ..."
+  // "actually" doubles as an intensifier ("you actually have to ...") — bias
+  // toward correction-signal forms: sentence-initial, post-comma, or after
+  // pronoun ("I actually meant...").
+  /^\s*actually[\s,]/iu,
+  /,\s*actually[\s,]/iu,
+  /\bi\s+actually[\s,]/iu,
   /^\s*sorry[\s,]/iu, // "Sorry, ..." sentence-initial (apology before re-spec)
   /\bi\s+meant\b/iu, // "I meant ..."
   /^\s*wait[\s,!.]/iu, // "Wait, ..." sentence-initial
