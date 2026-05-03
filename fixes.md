@@ -47,3 +47,7 @@ Third-pass (live end-to-end smoke test against fresh `codex exec` + `claude -p` 
 Fourth-pass (live tool-using `codex exec` session that called `apply_patch`):
 
 - Codex CLI now emits `apply_patch` as a `response_item/custom_tool_call` with the raw patch text in `payload.input`, not as a `function_call` with `payload.arguments` containing `{"patch": "..."}`. The extractor only handled `function_call`, so apply_patch was completely invisible — files touched, lines added, lines removed, and the apply_patch entry in TOP TOOLS were all silently zero for any session that edited files via the new shape. A fresh `codex exec` smoke that created hello.txt with two lines reported 0 files / 0 lines / no apply_patch tool. Extractor now handles both payload shapes uniformly via a `patchTextFromPayload` helper.
+
+Fifth-pass (rendered the long-running ongoing session and noticed `corrections 6/6 = 100%`):
+
+- `\bactually[\s,]` (English) and `\beigentlich[\s,]` (German) treated *every* in-sentence use of those words as a correction, but both double as intensifiers ("you actually have to test it", "ich war eigentlich zufrieden"). Real prompt repeated 5× in a /loop conversation reported 100% correction rate. Patterns now fire only on sentence-initial, post-comma, or pronoun-prefixed forms. The same session re-renders as 2/6 (33%).
