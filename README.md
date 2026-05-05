@@ -1,8 +1,9 @@
 # vibe-receipt
 
-> A beautiful paper-receipt card for every Claude Code & Codex CLI session.
-> Tokens, cost, files touched, deep-thought time, ESC-rage — all in a screenshot you can actually share.
+> Spotify-Wrapped-style receipts for your Claude Code & Codex CLI sessions.
+> Tokens, cost, files touched, deep-thought time, ESC-rage — rendered as a paper-receipt PNG you can actually share.
 
+[![CI](https://github.com/loris307/vibe-receipt/actions/workflows/ci.yml/badge.svg)](https://github.com/loris307/vibe-receipt/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![status](https://img.shields.io/badge/status-v0.3.0-orange)
 ![tested-against](https://img.shields.io/badge/tested-Claude%20Code%20%2B%20Codex%20CLI-blueviolet)
@@ -159,7 +160,7 @@ Up to 3 achievements, ordered rarest-first. Shown only when at least one fires. 
 | 🛠 `Toolbox Master` | ≥ 50 tool calls total. |
 | 🌙 `Night Owl` | Session start hour is between 22:00 and 05:59 UTC. |
 | 📚 `Researcher` | Read/Grep/WebFetch/Glob dominate the tool mix (researcher score ≥ 0.5). |
-| 🐛 `Bug Hunter` | Bug keywords (fix, bug, broken, error, fail/failed/failing, crash, wrong, hak) appear in a high fraction of prompts (fixer score ≥ 0.5). |
+| 🐛 `Bug Hunter` | Bug keywords (fix, bug, broken, error, fail/failed/failing, crash, wrong, hack) appear in a high fraction of prompts (fixer score ≥ 0.5). |
 | 🙏 `Polite` | `please + thanks + sorry` ≥ 5 across all prompts. |
 
 ### ARCHETYPE
@@ -354,14 +355,13 @@ Older versions counted subagent transcripts as separate sessions. Fixed in commi
 
 ---
 
-## Roadmap
+## What's shipped
 
-- **v1.0** — Claude Code + Codex CLI sources · single + combine + window modes · hook ✓
-- **v0.2** — history store, comparisons, archetypes, achievements ✓
-- **v0.3** — compactions, MCP servers, sidechain count, correction patterns ✓
-- **v1.1** — schema-drift canary, OG (1200×630) layout polish, optional AI-mood scoring (opt-in)
-- **v2.0** — wrapped engine: persistent SQLite history, streaks, achievements, year-in-review comparisons, Cursor support
-- **v3** (speculative) — opt-in cloud share for `vibe-receipt.dev/r/<hash>`, VS Code panel
+- **v0.1** — single-session rendering · ANSI preview · PNG output
+- **v0.2** — local history store, `vs last` / `week rank` comparisons, 8 archetypes, 12 achievements
+- **v0.3** — compactions, MCP servers, sidechain counts, correction patterns, English-only renders, CI on Node 20
+
+The scope is intentionally narrow: **per-session receipts that stay on your machine.** Streaks, year-in-review boards, multi-device sync, and persistent dashboards aren't planned here — that's a different project's problem. If you want any of those, file an issue and we'll talk.
 
 See [`docs/spec.md`](docs/spec.md) for the full design spec.
 
