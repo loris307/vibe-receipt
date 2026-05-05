@@ -39,6 +39,7 @@ TypeScript 5.7 (ESM-only, `"type": "module"`), Node ≥ 20.19.4, pnpm. Bundled w
 - When changing the `Receipt` shape, update `src/data/receipt-schema.ts` first, then propagate through aggregate → render → ansi. Schema is the contract.
 - Before claiming a fix or feature done, scan `fixes.md` Resolved list for issues in the same area to avoid regressing them.
 - IMPORTANT: run `pnpm typecheck` AND `pnpm lint` after every code change. Biome's `organizeImports` is canonical — never hand-sort imports; run `pnpm format`.
+- CI mirrors the four local gates (`lint → typecheck → test → build`) plus a CLI smoke (`doctor`) on `ubuntu-latest` + `macos-latest` at the engines.node floor (Node 20.19.4). When touching filesystem APIs or native deps (`@resvg/resvg-js`), watch the macOS slot — divergence shows up there first. Don't reach for `node:fs/promises#glob` (Node 22+) — use `readdir({ recursive: true })` to keep the Node 20 floor honest.
 
 ## Workflow
 - Conventional commits with em-dashes for clauses, e.g. `refactor: drop German support — English-only renders`. Prefixes in use: `feat`, `fix`, `refactor`, `docs`, `chore`, `release`.
