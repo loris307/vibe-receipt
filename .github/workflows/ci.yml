@@ -1,0 +1,57 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel in-progress runs for the same branch/PR when new commits land.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: lint · typecheck · test · build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # pnpm/action-setup picks up the version pinned in package.json (packageManager).
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          # Floor declared in package.json engines.node — test what we promise.
+          node-version: 20.19.4
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint (biome)
+        run: pnpm lint
+
+      - name: Typecheck (tsc)
+        run: pnpm typecheck
+
+      - name: Test (vitest)
+        run: pnpm test
+
+      - name: Build (tsdown)
+        run: pnpm build
+
+      # Verifies the bundle actually runs end-to-end: bin shebang, ESM resolution,
+      # font loading, and the @resvg/resvg-js native module. `doctor` is the
+      # canonical health check for these.
+      - name: Smoke test built CLI
+        run: |
+          node dist/cli.mjs --version
+          node dist/cli.mjs --help
+          node dist/cli.mjs doctor

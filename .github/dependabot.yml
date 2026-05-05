@@ -1,0 +1,33 @@
+version: 2
+updates:
+  # JS deps (pnpm-lock.yaml is supported by the npm ecosystem).
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      types:
+        patterns:
+          - "@types/*"
+      dev-patch-and-minor:
+        dependency-type: development
+        update-types:
+          - patch
+          - minor
+      prod-patch:
+        dependency-type: production
+        update-types:
+          - patch
+    commit-message:
+      prefix: chore
+      include: scope
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: chore
+      include: scope
