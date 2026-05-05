@@ -31,11 +31,15 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
 
-      - name: Setup Node
+      # We install + build under Node 22 (pnpm 10.28+ uses node:sqlite which
+      # needs ≥ 22.13). The published bundle still targets node20 (see
+      # tsdown.config.ts) and engines.node stays at >=20.19.4 — that's the
+      # runtime floor users get. The smoke step at the end swaps to Node
+      # 20.19.4 so we actually verify the engines claim instead of trusting it.
+      - name: Setup Node 22 (toolchain)
         uses: actions/setup-node@v6
         with:
-          # Floor declared in package.json engines.node — test what we promise.
-          node-version: 20.19.4
+          node-version: 22.13.0
           cache: pnpm
 
       - name: Install dependencies
@@ -53,11 +57,17 @@ jobs:
       - name: Build (tsdown)
         run: pnpm build
 
-      # Verifies the bundle actually runs end-to-end: bin shebang, ESM resolution,
-      # font loading, and the @resvg/resvg-js native module. `doctor` is the
-      # canonical health check for these.
-      - name: Smoke test built CLI
+      - name: Setup Node 20.19.4 (engines.node floor)
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20.19.4
+
+      # Verifies the bundle actually runs end-to-end on the declared engines
+      # floor: bin shebang, ESM resolution, font loading, and the
+      # @resvg/resvg-js native module. `doctor` is the canonical health check.
+      - name: Smoke test built CLI on Node 20
         run: |
+          node --version
           node dist/cli.mjs --version
           node dist/cli.mjs --help
           node dist/cli.mjs doctor
