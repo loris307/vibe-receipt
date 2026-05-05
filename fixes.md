@@ -57,3 +57,7 @@ Sixth-pass (drifted help text + hook receiver E2E):
 - `vibe-receipt help` was missing `history` from COMMANDS even though it's a real top-level command. `--out` default was documented as `<id>.png` but actual is `<id>-<size>.png`. Portrait was listed as `1080x1350` — actually `1080x1500` and auto-extends. Help text now matches behavior.
 
 Saturation point reached on 2026-05-04. Six audit passes (three static, three live end-to-end) found progressively narrower issues; the seventh pass turned up no real bugs (help-text drift was the only thing, fixed in pass six). Half-built `meta.inFlight` (renderer + schema + aggregator + spec all support it but no extractor sets it) is a feature gap left intentionally untouched per the "fix only what's broken" rule.
+
+Eighth pass (added GitHub Actions CI on Node 20.19.4 — the `engines.node` floor):
+
+- `node:fs/promises#glob` was added in Node 22.0.0; on 20.19.4 the named import resolves to `undefined` and the call throws synchronously. All four call sites (`extract/claude.ts` ×2, `extract/codex.ts`, `hook/sources-summary.ts`) wrapped the iterator in a `try { ... } catch {}` meant for "directory missing", which also swallowed the TypeError — so on Node 20 the loops never entered: subagent transcripts went unread, JSONL roots returned zero files, and `sources` reported empty trees. The `subagent-cost` test caught it (parent-only sum: 1M; expected parent + subagent: 2M). Replaced all four with `readdir(root, { recursive: true })` (Node ≥ 20.1.0, no behavior change on 22+).

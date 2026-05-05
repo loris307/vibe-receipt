@@ -1,5 +1,5 @@
 import { existsSync, statSync } from "node:fs";
-import { glob } from "node:fs/promises";
+import { readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { getClaudeJsonlRoots } from "../extract/claude.js";
 import { getCodexJsonlRoot } from "../extract/codex.js";
@@ -21,8 +21,10 @@ async function summarizeRoot(source: string, root: string): Promise<SourceRow> {
   let count = 0;
   let bytes = 0;
   try {
-    for await (const file of glob("**/*.jsonl", { cwd: root, withFileTypes: false })) {
-      const abs = resolve(root, String(file));
+    const entries = await readdir(root, { recursive: true });
+    for (const file of entries) {
+      if (!file.endsWith(".jsonl")) continue;
+      const abs = resolve(root, file);
       if (source === "claude" && isSubagentJsonl(abs)) continue;
       try {
         bytes += statSync(abs).size;

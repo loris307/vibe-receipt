@@ -1,4 +1,4 @@
-import { glob, stat } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 import type { LoadOpts, NormalizedSession, SourceLoader } from "../data/types.js";
@@ -62,8 +62,10 @@ async function listJsonlFilesWithMtime(): Promise<{ path: string; mtimeMs: numbe
   const root = getCodexJsonlRoot();
   const out: { path: string; mtimeMs: number }[] = [];
   try {
-    for await (const file of glob("**/*.jsonl", { cwd: root, withFileTypes: false })) {
-      const abs = resolve(root, String(file));
+    const entries = await readdir(root, { recursive: true });
+    for (const file of entries) {
+      if (!file.endsWith(".jsonl")) continue;
+      const abs = resolve(root, file);
       try {
         const s = await stat(abs);
         out.push({ path: abs, mtimeMs: s.mtimeMs });

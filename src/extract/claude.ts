@@ -1,4 +1,4 @@
-import { glob, stat } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 import type { LoadOpts, NormalizedSession } from "../data/types.js";
@@ -42,8 +42,10 @@ async function listJsonlFilesWithMtime(): Promise<{ path: string; mtimeMs: numbe
   const seen = new Set<string>();
   for (const root of roots) {
     try {
-      for await (const file of glob("**/*.jsonl", { cwd: root, withFileTypes: false })) {
-        const abs = resolve(root, String(file));
+      const entries = await readdir(root, { recursive: true });
+      for (const file of entries) {
+        if (!file.endsWith(".jsonl")) continue;
+        const abs = resolve(root, file);
         if (seen.has(abs)) continue;
         seen.add(abs);
         if (isSubagentJsonl(abs)) continue;
@@ -217,8 +219,10 @@ async function fallbackTokenSum(
     cacheReadTokens: 0,
   };
   try {
-    for await (const file of glob("*.jsonl", { cwd: subagentDir, withFileTypes: false })) {
-      const subPath = resolve(subagentDir, String(file));
+    const entries = await readdir(subagentDir);
+    for (const file of entries) {
+      if (!file.endsWith(".jsonl")) continue;
+      const subPath = resolve(subagentDir, file);
       const sub = await sumTokensInFile(subPath, sinceMs);
       subagent.inputTokens += sub.inputTokens;
       subagent.outputTokens += sub.outputTokens;
